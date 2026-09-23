@@ -1,0 +1,119 @@
+{
+  "layout": {
+    "gaps": 4,
+    "focus_follows_mouse": true,
+    "background_color": "#00000000",
+    "focus_ring": {
+      "enabled": true,
+      "width": 4,
+      "active_color": "#04a5e5",
+      "inactive_color": "#209fb5"
+    },
+    "border": {
+      "enabled": false,
+      "width": 4,
+      "active_color": "#ffc87f",
+      "inactive_color": "#505050",
+      "urgent_color": "#9b0000"
+    },
+    "shadow": {
+      "enabled": false,
+      "softness": 30,
+      "spread": 5,
+      "offset_x": 0,
+      "offset_y": 5,
+      "color": "#0007"
+    },
+    "struts": {
+      "left": 0,
+      "right": 0,
+      "top": 0,
+      "bottom": 0
+    }
+  },
+  "input": {
+    "keyboard": {
+      "xkb": {
+        "rules": "",
+        "model": "",
+        "layout": "",
+        "variant": "",
+        "options": ""
+      },
+      "numlock": true
+    },
+    "touchpad": {
+      "tap": true,
+      "natural_scroll": true,
+      "accel_speed": 0.5
+    },
+    "mouse": {
+      "natural_scroll": false,
+      "accel_speed": 0.2
+    },
+    "focus_follows_mouse": true,
+    "max_scroll_amount": 0.95
+  },
+  "outputs": {},
+  "workspaces": ["ID", "JP", "RU", "US", "DE/CH"],
+  "spawn_at_startup": [
+    "waybar",
+    "awww-daemon",
+    "hypridle",
+    "mako",
+    "fcitx5",
+    "gammastep"
+  ],
+  "window_rules": [],
+  "keybinds": [
+    { "modifiers": ["Super"], "key": "Return", "action": "spawn", "args": ["kitty"], "hotkey_overlay_title": "Open a Terminal: kitty" },
+    { "modifiers": ["Super"], "key": "R", "action": "spawn", "args": ["fuzzel"], "hotkey_overlay_title": "Run an Application: fuzzel" },
+    { "modifiers": ["Super", "Shift"], "key": "L", "action": "spawn", "args": ["hyprlock"], "hotkey_overlay_title": "Lock the Screen: hyprlock" },
+    { "modifiers": ["Super"], "key": "Slash", "action": "show_hotkey_overlay" },
+    { "modifiers": ["Super"], "key": "O", "action": "toggle_overview", "repeat": false },
+    { "modifiers": ["Super"], "key": "X", "action": "close_window", "repeat": false },
+    { "modifiers": ["Super"], "key": "Left", "action": "focus_column_left" },
+    { "modifiers": ["Super"], "key": "Down", "action": "focus_window_down" },
+    { "modifiers": ["Super"], "key": "Up", "action": "focus_window_up" },
+    { "modifiers": ["Super"], "key": "Right", "action": "focus_column_right" },
+    { "modifiers": ["Super"], "key": "H", "action": "focus_column_left" },
+    { "modifiers": ["Super"], "key": "J", "action": "focus_window_down" },
+    { "modifiers": ["Super"], "key": "K", "action": "focus_window_up" },
+    { "modifiers": ["Super"], "key": "L", "action": "focus_column_right" },
+    { "modifiers": ["Super", "Ctrl"], "key": "Left", "action": "move_column_left" },
+    { "modifiers": ["Super", "Ctrl"], "key": "Down", "action": "move_window_down" },
+    { "modifiers": ["Super", "Ctrl"], "key": "Up", "action": "move_window_up" },
+    { "modifiers": ["Super", "Ctrl"], "key": "Right", "action": "move_column_right" },
+    { "modifiers": ["Super", "Ctrl"], "key": "H", "action": "move_column_left" },
+    { "modifiers": ["Super", "Ctrl"], "key": "J", "action": "move_window_down" },
+    { "modifiers": ["Super", "Ctrl"], "key": "K", "action": "move_window_up" },
+    { "modifiers": ["Super", "Ctrl"], "key": "L", "action": "move_column_right" },
+    { "modifiers": ["Super"], "key": "Page_Down", "action": "focus_workspace_down" },
+    { "modifiers": ["Super"], "key": "Page_Up", "action": "focus_workspace_up" },
+    { "modifiers": ["Super"], "key": "U", "action": "focus_workspace_down" },
+    { "modifiers": ["Super"], "key": "I", "action": "focus_workspace_up" },
+    { "modifiers": ["Super", "Ctrl"], "key": "Page_Down", "action": "move_column_to_workspace_down" },
+    { "modifiers": ["Super", "Ctrl"], "key": "Page_Up", "action": "move_column_to_workspace_up" },
+    { "modifiers": ["Super", "Ctrl"], "key": "U", "action": "move_column_to_workspace_down" },
+    { "modifiers": ["Super", "Ctrl"], "key": "I", "action": "move_column_to_workspace_up" },
+    { "modifiers": ["Super", "Shift"], "key": "Page_Down", "action": "move_workspace_down" },
+    { "modifiers": ["Super", "Shift"], "key": "Page_Up", "action": "move_workspace_up" },
+    { "modifiers": ["Super", "Shift"], "key": "U", "action": "move_workspace_down" },
+    { "modifiers": ["Super", "Shift"], "key": "I", "action": "move_workspace_up" },
+    { "modifiers": ["Super"], "key": "V", "action": "toggle_window_floating" },
+    { "modifiers": ["Super", "Shift"], "key": "V", "action": "switch_focus_between_floating_and_tiling" },
+    { "modifiers": ["Super"], "key": "F", "action": "maximize_column" },
+    { "modifiers": ["Super", "Shift"], "key": "F", "action": "fullscreen_window" },
+    { "modifiers": ["Super", "Ctrl"], "key": "F", "action": "expand_column_to_available_width" },
+    { "modifiers": ["Super"], "key": "C", "action": "center_column" },
+    { "modifiers": ["Super", "Ctrl"], "key": "C", "action": "center_visible_columns" },
+    { "modifiers": ["Super"], "key": "Minus", "action": "set_column_width", "args": ["-10%"] },
+    { "modifiers": ["Super"], "key": "Equal", "action": "set_column_width", "args": ["+10%"] },
+    { "modifiers": ["Super", "Shift"], "key": "Minus", "action": "set_window_height", "args": ["-10%"] },
+    { "modifiers": ["Super", "Shift"], "key": "Equal", "action": "set_window_height", "args": ["+10%"] },
+    { "modifiers": ["Super"], "key": "E", "action": "quit" },
+    { "modifiers": ["Super"], "key": "P", "action": "power_off_monitors", "requires_shift": true }
+  ],
+  "prefer_no_csd": true,
+  "screenshot_path": "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
+}

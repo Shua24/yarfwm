@@ -1,0 +1,35 @@
+# Build artifacts
+build/
+meson-private/
+meson-info/
+meson-logs/
+
+# Compiled objects/binaries
+*.o
+*.a
+*.so
+*.dylib
+yarfwm
+src/yarfwm.p/
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Dependencies
+subprojects/
+package-lock.json
+yarn.lock
+
+# Test/coverage
+*.gcov
+*.gcno
+*.gcda
+coverage/

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <title>Yarfwm</title>
+  <defs>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#90e0ef"/>
+      <stop offset="0.5" stop-color="#0096c7"/>
+      <stop offset="1" stop-color="#03045e"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="116" height="116" rx="26" fill="url(#sea)"/>
+  <rect x="31" y="33" width="66" height="50" rx="9" fill="none" stroke="#caf0f8" stroke-width="6"/>
+  <line x1="31" y1="47" x2="97" y2="47" stroke="#caf0f8" stroke-width="6"/>
+  <circle cx="41" cy="40" r="3" fill="#caf0f8"/>
+  <circle cx="52" cy="40" r="3" fill="#caf0f8"/>
+  <path d="M12 96 q13 -11 26 0 t26 0 t26 0 t26 0" fill="none" stroke="#caf0f8" stroke-width="6" stroke-linecap="round"/>
+</svg>
