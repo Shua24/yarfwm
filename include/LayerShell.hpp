@@ -19,24 +19,29 @@ struct river_seat_v1;
 // one river_layer_shell_output_v1 per output (non-exclusive-area hint and
 // set_default) and one river_layer_shell_seat_v1 per seat (layer surface
 // keyboard focus). The callers that own those outputs and seats destroy them.
-class LayerShell {
-public:
-    LayerShell();
-    ~LayerShell();
+class LayerShell
+{
+      public:
+	LayerShell();
+	~LayerShell();
 
-    // Called from the registry handler when river advertises the global.
-    void bind_registry_global(struct wl_registry *registry, uint32_t name, uint32_t version);
+	// Called from the registry handler when river advertises the global.
+	void bind_registry_global(struct wl_registry *registry, uint32_t name,
+				  uint32_t version);
 
-    bool available() const;
+	bool available() const;
 
-    // Dynamic memory: each call returns a newly created protocol object; the
-    // caller owns it and destroys it with the matching _destroy request.
-    struct river_layer_shell_output_v1 *create_output_state(struct river_output_v1 *output);
-    struct river_layer_shell_seat_v1 *create_seat_state(struct river_seat_v1 *seat);
+	// Dynamic memory: each call returns a newly created protocol object;
+	// the caller owns it and destroys it with the matching _destroy
+	// request.
+	struct river_layer_shell_output_v1 *
+	create_output_state(struct river_output_v1 *output);
+	struct river_layer_shell_seat_v1 *
+	create_seat_state(struct river_seat_v1 *seat);
 
-    void terminate();
+	void terminate();
 
-    struct river_layer_shell_v1 *layer_shell;
+	struct river_layer_shell_v1 *layer_shell;
 };
 
 #endif // LAYER_SHELL_HPP

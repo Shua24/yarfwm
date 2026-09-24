@@ -23,46 +23,53 @@ class View;
 // Dynamic memory: one Output object is heap-allocated per output by the View
 // that owns it; terminate() destroys the protocol objects it holds and the
 // View then deletes the object itself.
-class Output {
-public:
-    Output();
-    ~Output();
+class Output
+{
+      public:
+	Output();
+	~Output();
 
-    bool initialize(LayerShell &layer_shell, struct river_output_v1 *output, View *view);
-    void terminate();
+	bool initialize(LayerShell &layer_shell, struct river_output_v1 *output,
+			View *view);
+	void terminate();
 
-    // Returns true when the set_default request was actually sent (layer shell
-    // state present).
-    bool set_default();
+	// Returns true when the set_default request was actually sent (layer
+	// shell state present).
+	bool set_default();
 
-    struct river_output_v1 *river_output;
-    int32_t x;
-    int32_t y;
-    int32_t width;
-    int32_t height;
-    bool has_dimensions;
+	struct river_output_v1 *river_output;
+	int32_t x;
+	int32_t y;
+	int32_t width;
+	int32_t height;
+	bool has_dimensions;
 
-    bool has_non_exclusive_area;
-    int32_t non_exclusive_area_x;
-    int32_t non_exclusive_area_y;
-    int32_t non_exclusive_area_width;
-    int32_t non_exclusive_area_height;
+	bool has_non_exclusive_area;
+	int32_t non_exclusive_area_x;
+	int32_t non_exclusive_area_y;
+	int32_t non_exclusive_area_width;
+	int32_t non_exclusive_area_height;
 
-private:
-    static void river_output_removed(void *data, struct river_output_v1 *output);
-    static void river_output_wl_output(void *data, struct river_output_v1 *output, uint32_t name);
-    static void river_output_position(void *data, struct river_output_v1 *output,
-                                      int32_t x, int32_t y);
-    static void river_output_dimensions(void *data, struct river_output_v1 *output,
-                                        int32_t width, int32_t height);
-    static void river_output_capture_sessions(void *data, struct river_output_v1 *output,
-                                              uint32_t count);
-    static void layer_shell_output_non_exclusive_area(
-        void *data, struct river_layer_shell_output_v1 *layer_shell_output,
-        int32_t x, int32_t y, int32_t width, int32_t height);
+      private:
+	static void river_output_removed(void *data,
+					 struct river_output_v1 *output);
+	static void river_output_wl_output(void *data,
+					   struct river_output_v1 *output,
+					   uint32_t name);
+	static void river_output_position(void *data,
+					  struct river_output_v1 *output,
+					  int32_t x, int32_t y);
+	static void river_output_dimensions(void *data,
+					    struct river_output_v1 *output,
+					    int32_t width, int32_t height);
+	static void river_output_capture_sessions(
+	    void *data, struct river_output_v1 *output, uint32_t count);
+	static void layer_shell_output_non_exclusive_area(
+	    void *data, struct river_layer_shell_output_v1 *layer_shell_output,
+	    int32_t x, int32_t y, int32_t width, int32_t height);
 
-    struct river_layer_shell_output_v1 *layer_shell_output;
-    View *view;
+	struct river_layer_shell_output_v1 *layer_shell_output;
+	View *view;
 };
 
 #endif // OUTPUT_HPP

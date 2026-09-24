@@ -25,16 +25,35 @@ Pre-1.0, under active development. Verified live on 2026-09-23 against river
   (verified with `foot`)
 - Supports layer shell: wallpaper clients and bars map correctly, including
   exclusive-zone tracking (verified with `swaybg`, `wbg` and `waybar`)
+- Keyboard bindings: the config's 43 binds are parsed, the 15 that name
+  implemented actions register per seat, and spawn / close / directional focus /
+  focus-previous / quit / exit-session fire on injected key events (verified with
+  `wtype`; see `docs/keybinds.md`)
+- Key repeat: a held focus binding repeats (verified with `wtype` holding
+  `Super+Right` for 1.5s → 29 repeats; a held `spawn` still fires once)
+- Pointer focus: click-to-focus and focus-follows-mouse both focus the window
+  under a virtual pointer, and the setting is honoured — with
+  `focus_follows_mouse: false` a motion focuses nothing (verified with
+  `zwlr_virtual_pointer_v1`)
+- Lock screen: after a lock surface releases the keyboard the focused window is
+  re-focused, so typing resumes without a click (verified with `swaylock`;
+  without the fix the same probe leaves the keyboard unfocused)
+- Closing the last window no longer crashes: the window is dropped from the
+  tracked list before the seat picks a fallback, so the fallback can never be
+  the dying window (before the fix: SIGSEGV, exit 139, verified with a control)
+- A window dying while an overlay holds exclusive keyboard focus no longer
+  strands the keyboard: the recorded fallback survives the lock and is applied
+  when the overlay lets go (before the fix: no focus request at all, verified
+  with a control)
 - Exits cleanly when river shuts down (exit code 0, no crash)
 
 Not implemented yet:
 
-- Keybindings — `river-xkb-bindings-v1` is vendored, but the binding code is a stub
-- Seat focus — pointer enter, focus follows mouse, keyboard focus
+- The 18 actions the default config names but the engine does not implement —
+  logged once and skipped at startup (`docs/keybinds.md`)
 - Window decorations — borders and focus rings are declared in the config but
   nothing draws them yet
-- Config consumption — `config.json` is parsed and validated, but no feature
-  reads the values yet
+- Window rules — `window_rules` is parsed but never applied
 
 ## Requirements
 
@@ -78,18 +97,66 @@ connection (river refuses a second one):
 ./build/src/yarfwm
 ```
 
-Install for development — binary to `/usr/local/bin/yarfwm`, plus the desktop
-entry, session script and icon:
+Install for development — binary to `/usr/local/bin/yarfwm`, plus the icon:
 
 ```
 sudo ninja -C build install
 ```
 
 A typical river setup backgrounds a wallpaper client and execs the window
-manager from the river init script (`data/yarfwm-session` does the `exec` half).
-Note that river closes layer surfaces immediately when no window manager holds
-`river_layer_shell_v1`, so the window manager must be running for wallpapers and
-bars to map.
+manager from the river init script. Note that river closes layer surfaces
+immediately when no window manager holds `river_layer_shell_v1`, so the window
+manager must be running for wallpapers and bars to map.
+
+## Starting Yarfwm
+
+Yarfwm is a window manager *client*: it speaks
+`river-window-management-v1` to river, and river is the compositor. Yarfwm on
+its own, with no compositor, has nothing to talk to. Start it from river's init
+script, which is how a normal login does it.
+
+From a tty, run river with Yarfwm as its window manager:
+
+```
+river -c yarfwm
+```
+
+Or let river's own init script start it, which is what a normal login does. The
+init script at `$XDG_CONFIG_HOME/river/init` (or `~/.config/river/init`) is
+executed by river on startup:
+
+```sh
+#!/bin/sh
+wbg "$HOME/Pictures/Wallies/wallpaper.jpg" &
+waybar &
+exec yarfwm
+```
+
+`exec yarfwm` works here because river is already running and already
+advertising `river_window_manager_v1` — Yarfwm connects to it as a client.
+
+### Why there is no desktop entry
+
+Yarfwm ships no `.desktop` file, in either `applications/` or
+`wayland-sessions/`, because neither entry point matches how river works.
+
+River's own mechanism for choosing a window manager is the init script: river
+executes `$XDG_CONFIG_HOME/river/init` (or `~/.config/river/init`) on startup
+and expects it to `exec` the window manager. That is the supported way to start
+Yarfwm, and it is what a normal login does.
+
+- A **display manager session entry** would have to be `Exec=river -c yarfwm`.
+  River's `-c` option exists to *override* the default search paths for the init
+  executable — using it in a session file bypasses the user's own
+  `~/.config/river/init`, so their wallpaper, bar and per-machine setup would
+  silently stop running. River's own packaged session entry is a plain
+  `Exec=river`, which runs the init script as intended.
+- An **application entry** would have to be `Exec=yarfwm`, which starts a window
+  manager client with no compositor to connect to. It cannot work by
+  construction.
+
+Start Yarfwm from the river init script, or by running `river -c yarfwm` from a
+tty when you deliberately want to skip the init script.
 
 The configuration file lives at `$HOME/.config/yarfwm/config.json`. It is
 written from a default embedded in the binary on first startup, and never
@@ -105,7 +172,9 @@ river-window-management-v1.xml    core protocol definition — the single source
 protocols/                        layer-shell + xkb-bindings protocol XMLs and their build rules
 src/                              implementation
 include/                          headers (mirrors src/)
-data/                             desktop entry, session script, icon, default config (config.json.in)
+data/                             icon and default config (config.json.in)
+docs/                             developer notes (keybindings)
+.clang-format                     the code style, applied with clang-format -i
 build/                            meson output directory — generated, never edit, never commit
 ```
 
@@ -125,12 +194,17 @@ view → keybind. Dependency direction, top to bottom:
 | `Server` | Wayland connection and registry. Owns the `wl_registry` proxy. |
 | `Display` | Registry listener. Binds `river_window_manager_v1` (clamped to the protocol version) and delegates `river_layer_shell_v1` to `LayerShell`. |
 | `LayerShell` | Owns the layer shell global; creates per-output and per-seat state objects. |
-| `View` | The policy core: the manage/render handshake, window and output tracking, floating cascade placement. Owns the `Output` objects. |
+| `View` | The policy core: window and output tracking, floating cascade placement. Owns the `Output` objects. The manage/render handshake lives in `ViewSequences`. |
 | `ViewEvents` | Listener trampolines for the window-management events. |
+| `ViewActions` | The View requests the event handlers and the keybind engine make (close, manage, focus queries, exit session). |
+| `ViewSequences` | The two sequence handlers, `window_manager_manage_start` and `window_manager_render_start`. |
 | `Output` | Per-output state: position, dimensions, layer-shell non-exclusive area, `set_default`. |
-| `Seat` | Per-seat state; currently layer-shell focus tracking. |
+| `Seat` | Per-seat state: keyboard focus and focus history, layer-shell focus tracking. |
 | `Config` | JSON parsing and the first-startup config write. |
-| `Keybind` | Not implemented yet. |
+| `Keybind` | Keyboard bindings: parses `keybinds`, registers one binding object per bind per seat, drives held-key repeat. Action dispatch lives in `KeybindActions`, config parsing in `KeybindParse`. See `docs/keybinds.md`. |
+| `KeybindParse` | The parsing half of the engine: action names, `args`, keysym and modifier resolution. |
+| `KeybindActions` | What a binding does when it fires: `perform` and the `spawn` fork/exec. |
+| `RepeatTimer` | The timerfd behind held-key repeat; the main loop polls it next to the Wayland socket. |
 
 ## Invariants (read before patching)
 
@@ -152,9 +226,9 @@ view → keybind. Dependency direction, top to bottom:
    happened with the registry and is now guarded by convention.
 5. **Style constraints.** Every file stays under 500 lines. Identifiers use full
    words, no abbreviations (`shared_memory`, not `shm`). Code is C++17 in a
-   "C with classes" style. The line style target is the Linux kernel's (tabs,
-   80 columns) but the tree is not converted yet — treat it as the direction
-   for new code.
+   "C with classes" style, formatted in the Linux kernel's line style (tabs,
+   80 columns). `.clang-format` at the repository root is the single source of
+   truth — run `clang-format -i` on the files you touch.
 
 ## Developing
 
@@ -177,8 +251,12 @@ Read river's `debug(wm):` log lines: `window 'foot' mapped`,
 non-exclusive area (what a bar leaves for windows) appears in the WM's stderr as
 `Yarfwm: non-exclusive area x,y WxH`.
 
-Caveat: headless river has no seat (no input devices), so keyboard and focus
-paths cannot be exercised there — those need a real session.
+Note on input: headless river still advertises a seat (`wl_seat` plus
+`river_xkb_bindings_v1`), so keyboard bindings can be exercised there by
+injecting synthetic key events with a virtual-keyboard client such as `wtype`
+(not packaged on this machine; it builds from source in a scratch directory).
+Pointer paths (click-to-focus) have not been exercised headless yet — treat
+those as needing a real session until a pointer-injection recipe exists.
 
 ### Tests
 
@@ -214,7 +292,7 @@ Never check in generated protocol files.
 
 ## License
 
-MIT — declared in `meson.build`. Note: **no `LICENSE` file exists in the
-repository yet**; one should be added before distributing. The protocol XMLs
-vendored under `protocols/` are MIT-licensed, © 2025 Isaac Freund; their
-copyright headers are preserved in the files.
+GPL-2.0 — the full text is in `LICENSE` at the repository root; `meson.build`
+declares the same. The protocol XMLs vendored under `protocols/` are
+MIT-licensed, © 2025 Isaac Freund; their copyright headers are preserved in the
+files, and they remain under their own terms.

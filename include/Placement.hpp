@@ -1,0 +1,40 @@
+#ifndef PLACEMENT_HPP
+#define PLACEMENT_HPP
+
+#include <cstdint>
+
+// Which way a directional focus move looks, used by
+// View::window_in_direction(). This lives here rather than in View.hpp so the
+// placement arithmetic below can be unit tested without pulling in the whole
+// View header (and with it the generated protocol headers).
+enum FocusDirection {
+	focus_direction_left = 0,
+	focus_direction_right = 1,
+	focus_direction_up = 2,
+	focus_direction_down = 3,
+};
+
+// A rectangle in output coordinates. Same field order and meaning as the
+// window geometry the View tracks, so it can be passed straight through.
+struct Rectangle {
+	int32_t x;
+	int32_t y;
+	int32_t width;
+	int32_t height;
+};
+
+// One cascade step, exactly as View::place_windows() performs it: advance by
+// the cascade step, then wrap back to the area origin while keeping a margin.
+// The result is written through the pointers, matching the output-parameter
+// style of the other placement helpers and avoiding -Waggregate-return.
+void cascade_next(const Rectangle &area, int32_t x, int32_t y, int32_t *next_x,
+		  int32_t *next_y);
+
+// The directional-focus score used by View::window_in_direction(). A negative
+// return means the candidate is not in the requested direction at all;
+// otherwise the score is the distance along the asked-for axis plus half the
+// sideways offset, and the lowest score wins.
+double direction_score(const Rectangle &source, const Rectangle &candidate,
+		       enum FocusDirection direction);
+
+#endif // PLACEMENT_HPP
