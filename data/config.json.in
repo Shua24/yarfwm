@@ -1,75 +1,11 @@
 {
-  "layout": {
-    "gaps": 4,
-    "background_color": "#00000000",
-    "focus_ring": {
-      "enabled": true,
-      "width": 4,
-      "active_color": "#04a5e5",
-      "inactive_color": "#209fb5"
-    },
-    "border": {
-      "enabled": false,
-      "width": 4,
-      "active_color": "#ffc87f",
-      "inactive_color": "#505050",
-      "urgent_color": "#9b0000"
-    },
-    "shadow": {
-      "enabled": false,
-      "softness": 30,
-      "spread": 5,
-      "offset_x": 0,
-      "offset_y": 5,
-      "color": "#0007"
-    },
-    "struts": {
-      "left": 0,
-      "right": 0,
-      "top": 0,
-      "bottom": 0
-    }
-  },
   "input": {
-    "keyboard": {
-      "xkb": {
-        "rules": "",
-        "model": "",
-        "layout": "",
-        "variant": "",
-        "options": ""
-      },
-      "numlock": true
-    },
-    "touchpad": {
-      "tap": true,
-      "natural_scroll": true,
-      "accel_speed": 0.5
-    },
-    "mouse": {
-      "natural_scroll": false,
-      "accel_speed": 0.2
-    },
-    "focus_follows_mouse": true,
-    "max_scroll_amount": 0.95
+    "focus_follows_mouse": true
   },
-  "outputs": {},
-  "workspaces": ["ID", "JP", "RU", "US", "DE/CH"],
-  "spawn_at_startup": [
-    "waybar",
-    "awww-daemon",
-    "hypridle",
-    "mako",
-    "fcitx5",
-    "gammastep"
-  ],
-  "window_rules": [],
   "keybinds": [
-    { "modifiers": ["Super"], "key": "Return", "action": "spawn", "args": ["kitty"], "hotkey_overlay_title": "Open a Terminal: kitty" },
-    { "modifiers": ["Super"], "key": "R", "action": "spawn", "args": ["fuzzel"], "hotkey_overlay_title": "Run an Application: fuzzel" },
-    { "modifiers": ["Super", "Shift"], "key": "L", "action": "spawn", "args": ["hyprlock"], "hotkey_overlay_title": "Lock the Screen: hyprlock" },
-    { "modifiers": ["Super"], "key": "Slash", "action": "show_hotkey_overlay" },
-    { "modifiers": ["Super"], "key": "O", "action": "toggle_expose", "repeat": false },
+    { "modifiers": ["Super"], "key": "Return", "action": "spawn", "args": ["kitty"] },
+    { "modifiers": ["Super"], "key": "R", "action": "spawn", "args": ["fuzzel"] },
+    { "modifiers": ["Super", "Shift"], "key": "L", "action": "spawn", "args": ["hyprlock"] },
     { "modifiers": ["Super"], "key": "X", "action": "close_window", "repeat": false },
     { "modifiers": ["Super"], "key": "Left", "action": "focus_window_left" },
     { "modifiers": ["Super"], "key": "Down", "action": "focus_window_down" },
@@ -87,6 +23,10 @@
     { "modifiers": ["Super", "Ctrl"], "key": "J", "action": "move_window_down" },
     { "modifiers": ["Super", "Ctrl"], "key": "K", "action": "move_window_up" },
     { "modifiers": ["Super", "Ctrl"], "key": "L", "action": "move_window_right" },
+    { "modifiers": ["Super", "Shift"], "key": "Left", "action": "move_pointer_left" },
+    { "modifiers": ["Super", "Shift"], "key": "Down", "action": "move_pointer_down" },
+    { "modifiers": ["Super", "Shift"], "key": "Up", "action": "move_pointer_up" },
+    { "modifiers": ["Super", "Shift"], "key": "Right", "action": "move_pointer_right" },
     { "modifiers": ["Super"], "key": "Page_Down", "action": "focus_desktop_next" },
     { "modifiers": ["Super"], "key": "Page_Up", "action": "focus_desktop_previous" },
     { "modifiers": ["Super"], "key": "U", "action": "focus_desktop_next" },
@@ -108,7 +48,5 @@
     { "modifiers": ["Super", "Shift"], "key": "Equal", "action": "set_window_height", "args": ["+10%"] },
     { "modifiers": ["Super"], "key": "E", "action": "quit" },
     { "modifiers": ["Super", "Shift"], "key": "E", "action": "exit_session" }
-  ],
-  "prefer_no_csd": true,
-  "screenshot_path": "~/Pictures/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
+  ]
 }

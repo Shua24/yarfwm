@@ -27,29 +27,6 @@
 // invert or collapse it.
 static const int32_t minimum_extent = 64;
 
-// Clamp a proposed size to the bounds the window stated in its
-// dimensions_hint event. Zero means "no preference" for that value, which is
-// how the protocol spells it: "A value of 0 indicates that the window has no
-// preference for that value." The bounds are passed as values because
-// View::Window is private to View and this stays a free function.
-static void apply_dimension_hints(int32_t min_width, int32_t min_height,
-				  int32_t max_width, int32_t max_height,
-				  Rectangle &geometry)
-{
-	if (min_width > 0 && geometry.width < min_width) {
-		geometry.width = min_width;
-	}
-	if (min_height > 0 && geometry.height < min_height) {
-		geometry.height = min_height;
-	}
-	if (max_width > 0 && geometry.width > max_width) {
-		geometry.width = max_width;
-	}
-	if (max_height > 0 && geometry.height > max_height) {
-		geometry.height = max_height;
-	}
-}
-
 // Pick the output a fullscreen window should fill.
 //
 // River's fullscreen REQUEST does not allow a null output ("<arg name="output"
@@ -404,18 +381,17 @@ void View::resize_window(struct river_window_v1 *window, bool resize_width,
 
 void View::apply_decoration_hint(struct river_window_v1 *window, uint32_t hint)
 {
-	Window *window_entry = find_window(window);
-	if (!window_entry || window_entry->decoration_sent) {
+	if (!find_window(window)) {
 		return;
 	}
-	window_entry->decoration_hint = hint;
-	window_entry->decoration_sent = true;
 
-	// The hint is what the window says it would like. River's own default
-	// when the window manager sends neither request is client-side
-	// decorations, and prefer_no_csd in the config only affects windows
-	// that express no preference at all. The requests are allowed in
-	// either sequence, so they go out in the next manage sequence.
+	// Nothing is sent back, on purpose. River's default when the window
+	// manager sends neither use_csd nor use_ssd is client-side
+	// decorations, so windows that want CSD already get it; honouring a
+	// server-side hint would mean drawing the decoration here, and
+	// yarfwm has no renderer. The XML allows the hint to be re-sent
+	// whenever the window changes its preferences, so every event is
+	// logged rather than only the first.
 	switch (hint) {
 	case RIVER_WINDOW_V1_DECORATION_HINT_ONLY_SUPPORTS_CSD:
 	case RIVER_WINDOW_V1_DECORATION_HINT_PREFERS_CSD:
@@ -432,5 +408,4 @@ void View::apply_decoration_hint(struct river_window_v1 *window, uint32_t hint)
 			     "Yarfwm: decoration hint -> no preference\n");
 		break;
 	}
-	request_manage();
 }

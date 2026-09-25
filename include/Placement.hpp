@@ -37,4 +37,15 @@ void cascade_next(const Rectangle &area, int32_t x, int32_t y, int32_t *next_x,
 double direction_score(const Rectangle &source, const Rectangle &candidate,
 		       enum FocusDirection direction);
 
+// Wrap a desktop index into [0, count): positive modulo, so a switch left
+// from desktop 0 lands on the last desktop, not on -1. A non-positive count
+// has no valid index and yields 0.
+int wrap_desktop(int desktop, int count);
+
+// Clamp a proposed size to the bounds the window stated in its
+// dimensions_hint event. Zero means "no preference" for that value.
+void apply_dimension_hints(int32_t min_width, int32_t min_height,
+			   int32_t max_width, int32_t max_height,
+			   Rectangle &geometry);
+
 #endif // PLACEMENT_HPP

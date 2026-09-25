@@ -16,3 +16,81 @@ placement_test = executable(
 )
 
 test('placement', placement_test)
+
+placement_helpers_test = executable(
+  'placement_helpers_test',
+  'PlacementHelpersTest.cpp',
+  '../src/Placement.cpp',
+  include_directories: [include_directories('../include')],
+  dependencies: [gtest, gtest_main],
+)
+
+test('placement_helpers', placement_helpers_test)
+
+# Config::load reads $HOME, so every case redirects it to a scratch directory
+# (see the header comment in ConfigTest.cpp). default_config_header provides
+# the embedded default the fallback path writes.
+config_test = executable(
+  'config_test',
+  'ConfigTest.cpp',
+  '../src/Config.cpp',
+  default_config_header,
+  include_directories: [
+    include_directories('../include'),
+    include_directories('../src'),
+  ],
+  dependencies: [gtest, gtest_main, jsoncpp],
+)
+
+test('config', config_test)
+
+# The parser half of the key binding engine: KeybindParse.cpp is
+# self-contained (no Keybind object is constructed), so it links without the
+# rest of the engine.
+keybind_parse_test = executable(
+  'keybind_parse_test',
+  'KeybindParseTest.cpp',
+  '../src/KeybindParse.cpp',
+  river_window_management_client_header,
+  include_directories: [
+    include_directories('../include'),
+    protocols_include_directories,
+  ],
+  dependencies: [gtest, gtest_main, xkbcommon, jsoncpp],
+)
+
+test('keybind_parse', keybind_parse_test)
+
+# The session lock guard lives in View and its handlers reference the whole
+# View/Seat closure, so this test links the core whole (minus main.cpp). The
+# regression it guards against: session_unlocked failing to clear the flag,
+# which silently refuses every key binding for the rest of the run.
+view_lock_test = executable(
+  'view_lock_test',
+  'ViewLockTest.cpp',
+  yarfwm_core_sources,
+  river_window_management_client_header,
+  river_window_management_protocol_source,
+  river_layer_shell_client_header,
+  river_layer_shell_protocol_source,
+  river_xkb_bindings_client_header,
+  river_xkb_bindings_protocol_source,
+  default_config_header,
+  include_directories: [
+    include_directories('../include'),
+    include_directories('../src'),
+    protocols_include_directories,
+  ],
+  dependencies: [
+    gtest,
+    gtest_main,
+    wayland_client,
+    xkbcommon,
+    pixman,
+    math,
+    jsoncpp,
+  ],
+)
+
+test('view_lock', view_lock_test)
+

@@ -19,28 +19,13 @@
 // not minimized. Switching desktops is a hide/show sweep plus a focus fixup,
 // because the focused window may be on the desktop that just went away.
 
-// How many virtual desktops exist, and how a switch wraps around them.
-// Positive modulo: a switch left from desktop 0 must land on the last desktop,
-// not on -1.
-static int wrap_desktop(int desktop)
-{
-	const int count = View::desktop_total();
-	if (count <= 0) {
-		return 0;
-	}
-	desktop %= count;
-	if (desktop < 0) {
-		desktop += count;
-	}
-	return desktop;
-}
-
 void View::focus_desktop(struct river_seat_v1 *river_seat, int delta)
 {
 	if (delta == 0) {
 		return;
 	}
-	active_desktop = wrap_desktop(active_desktop + delta);
+	active_desktop =
+	    wrap_desktop(active_desktop + delta, View::desktop_total());
 	std::fprintf(stderr, "Yarfwm: focus_desktop -> %d\n", active_desktop);
 
 	// River has no desktop concept, so switching is hide and show. The
@@ -93,7 +78,8 @@ void View::move_window_to_desktop(struct river_window_v1 *window, int delta)
 		return;
 	}
 
-	window_entry->desktop = wrap_desktop(window_entry->desktop + delta);
+	window_entry->desktop =
+	    wrap_desktop(window_entry->desktop + delta, View::desktop_total());
 	std::fprintf(stderr, "Yarfwm: move_window_to_desktop -> %d\n",
 		     window_entry->desktop);
 	// Sending it to another desktop makes it disappear from this one.

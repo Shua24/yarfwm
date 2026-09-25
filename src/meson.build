@@ -1,5 +1,7 @@
-yarfwm_sources = files(
-  'main.cpp',
+# Everything but the entry point. The lock-guard test links the core whole
+# (the guard lives in View and its handlers reference the View/Seat closure),
+# so main.cpp is kept out of this list.
+yarfwm_core_sources = files(
   'Yarfwm.cpp',
   'Server.cpp',
   'Display.cpp',
@@ -21,6 +23,8 @@ yarfwm_sources = files(
   'LayerShell.cpp',
   'Output.cpp',
 )
+
+yarfwm_sources = yarfwm_core_sources + files('main.cpp')
 
 # The default configuration is embedded in the executable so that first
 # startup can write config.json without any installed data files.

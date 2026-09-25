@@ -69,34 +69,12 @@ bool Config::parse_file(const std::string &path)
 		return false;
 	}
 
-	layout = root.get("layout", Json::Value());
+	// Only the settings with a consumer are carried: the input block
+	// (read by Seat) and the keybinds array (read by Keybind). A key
+	// nothing reads is not a setting, and it returns to the config only
+	// with the feature that consumes it.
 	input = root.get("input", Json::Value());
-	outputs = root.get("outputs", Json::Value());
-
-	workspaces.clear();
-	const Json::Value &workspaces_value = root["workspaces"];
-	if (workspaces_value.isArray()) {
-		for (const auto &item : workspaces_value) {
-			if (item.isString()) {
-				workspaces.push_back(item.asString());
-			}
-		}
-	}
-
-	spawn_at_startup.clear();
-	const Json::Value &spawn_value = root["spawn_at_startup"];
-	if (spawn_value.isArray()) {
-		for (const auto &item : spawn_value) {
-			if (item.isString()) {
-				spawn_at_startup.push_back(item.asString());
-			}
-		}
-	}
-
-	window_rules = root.get("window_rules", Json::Value());
 	keybinds = root.get("keybinds", Json::Value());
-	prefer_no_csd = root.get("prefer_no_csd", true).asBool();
-	screenshot_path = root.get("screenshot_path", "").asString();
 	return true;
 }
 

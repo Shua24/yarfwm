@@ -351,3 +351,56 @@ void Seat::river_seat_op_cancel_touch(void *data,
 		seat->view->request_manage();
 	}
 }
+
+// Keyboard-driven pointer warping.
+//
+// river_seat_v1.pointer_warp is manage-sequence-only, so a key press records
+// an offset from the last position river reported (the pointer_position
+// event, stored per seat in Seat.cpp) and apply_pointer_warp() sends the
+// warp during the next manage sequence. Offsets accumulate while a press is
+// waiting for its sequence, so a held key (the repeat timer) walks the
+// pointer instead of stalling. River clamps the target itself: "If the given
+// position is outside the bounds of all outputs, the pointer will be warped
+// to the closest point inside an output instead."
+
+void Seat::move_pointer(struct river_seat_v1 *river_seat, int32_t delta_x,
+			int32_t delta_y)
+{
+	SeatEntry *entry = find_entry(river_seat);
+	if (!entry || entry->removed || !view) {
+		return;
+	}
+	if (delta_x == 0 && delta_y == 0) {
+		return;
+	}
+
+	entry->pointer_warp_delta_x += delta_x;
+	entry->pointer_warp_delta_y += delta_y;
+	entry->pointer_warp_pending = true;
+
+	// pointer_warp is manage-sequence-only, so ask for the sequence that
+	// will send it.
+	view->request_manage();
+}
+
+void Seat::apply_pointer_warp()
+{
+	for (int i = 0; i < seat_count; i++) {
+		SeatEntry *entry = &seat_entries[i];
+		if (!entry->river_seat || !entry->pointer_warp_pending) {
+			continue;
+		}
+
+		const int32_t x =
+		    entry->pointer_x + entry->pointer_warp_delta_x;
+		const int32_t y =
+		    entry->pointer_y + entry->pointer_warp_delta_y;
+		river_seat_v1_pointer_warp(entry->river_seat, x, y);
+		std::fprintf(stderr, "Yarfwm: pointer warp %d,%d -> %d,%d\n",
+			     entry->pointer_x, entry->pointer_y, x, y);
+
+		entry->pointer_warp_delta_x = 0;
+		entry->pointer_warp_delta_y = 0;
+		entry->pointer_warp_pending = false;
+	}
+}

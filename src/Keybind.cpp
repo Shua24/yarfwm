@@ -47,9 +47,9 @@ bool Keybind::initialize(Server *server, Display *display, Seat *seat,
 	}
 
 	std::vector<std::string> reported_missing;
-	// Entries dropped because their action has no implementation. Counted
-	// separately from reported_missing, which counts distinct action names:
-	// several entries can share one unimplemented action, so the two
+	// Entries dropped because their action name is unknown. Counted
+	// separately from reported_missing, which counts distinct action
+	// names: several entries can share one unknown action, so the two
 	// numbers differ. The startup line reports both so a reader can
 	// reconcile registered + skipped against the config's entry count.
 	int skipped_entry_count = 0;
@@ -62,31 +62,9 @@ bool Keybind::initialize(Server *server, Display *display, Seat *seat,
 		// carry their percentage in it.
 		const std::vector<std::string> arguments = read_arguments(bind);
 		const Action action = parse_action(action_name, arguments);
-		if (action.kind == action_unavailable) {
-			// Recognised, but river's protocol cannot carry it
-			// out. Reported once so the gap is visible instead of
-			// looking like a working binding that does nothing.
-			bool already_reported = false;
-			for (const std::string &reported : reported_missing) {
-				already_reported =
-				    already_reported || reported == action_name;
-			}
-			if (!already_reported) {
-				reported_missing.push_back(action_name);
-				std::fprintf(stderr,
-					     "Yarfwm: keybind action cannot be "
-					     "implemented through river's "
-					     "protocol, skipping: %s\n",
-					     action_name.c_str());
-			}
-			skipped_entry_count++;
-			continue;
-		}
 		if (action.kind == action_none) {
-			// This batch renamed the config to floating action
-			// names and runs the actions that exist; the rest are
-			// reported once and skipped, so their keys keep
-			// reaching the focused window.
+			// An unknown action name: reported once and skipped,
+			// so the key keeps reaching the focused window.
 			bool already_reported = false;
 			for (const std::string &reported : reported_missing) {
 				already_reported =
@@ -124,13 +102,15 @@ bool Keybind::initialize(Server *server, Display *display, Seat *seat,
 		definition.action = action;
 
 		// Held-key repeat. An explicit "repeat" in the config wins;
-		// otherwise only the directional focus moves repeat. Spawning
-		// a program or quitting on every repeat tick would be wrong.
+		// otherwise the directional focus moves and the keyboard
+		// pointer warps repeat. Spawning a program or quitting on
+		// every repeat tick would be wrong.
 		const Json::Value &repeat_value = bind["repeat"];
 		definition.repeats =
 		    repeat_value.isBool()
 			? repeat_value.asBool()
-			: action.kind == action_focus_direction;
+			: (action.kind == action_focus_direction ||
+			   action.kind == action_move_pointer);
 
 		if (definition.action.kind == action_spawn) {
 			definition.action.arguments = arguments;
@@ -156,11 +136,17 @@ bool Keybind::initialize(Server *server, Display *display, Seat *seat,
 	// single-shot.
 	repeat_timer.initialize();
 
-	std::fprintf(stderr,
-		     "Yarfwm: %zu key bindings parsed, %d entries skipped "
-		     "(%zu distinct actions not implemented yet)\n",
-		     definitions.size(), skipped_entry_count,
-		     reported_missing.size());
+	if (skipped_entry_count > 0) {
+		std::fprintf(stderr,
+			     "Yarfwm: %zu key bindings parsed, %d entries "
+			     "skipped (%zu distinct actions not implemented "
+			     "yet)\n",
+			     definitions.size(), skipped_entry_count,
+			     reported_missing.size());
+	} else {
+		std::fprintf(stderr, "Yarfwm: %zu key bindings parsed\n",
+			     definitions.size());
+	}
 	return true;
 }
 

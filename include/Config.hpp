@@ -6,6 +6,10 @@
 #include <vector>
 
 // Represents parsed runtime configuration loaded from config.json.
+//
+// Only the settings with a consumer are carried: input.focus_follows_mouse
+// (read by Seat) and the keybinds array (read by Keybind). A key nothing
+// reads is not a setting; it is removed rather than stored.
 class Config
 {
       public:
@@ -14,15 +18,8 @@ class Config
 
 	bool load(const std::string &path);
 
-	Json::Value layout;
 	Json::Value input;
-	Json::Value outputs;
-	std::vector<std::string> workspaces;
-	std::vector<std::string> spawn_at_startup;
-	Json::Value window_rules;
 	Json::Value keybinds;
-	bool prefer_no_csd;
-	std::string screenshot_path;
 
       private:
 	std::string user_config_path() const;

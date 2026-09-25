@@ -34,7 +34,7 @@ View::View()
       output_capacity(0), default_layer_output(nullptr),
       pending_manage_count(0), pending_render_count(0),
       shutdown_requested(false), manage_requested(false), keybind(nullptr),
-      session_locked(false), session_lock_known(false), active_desktop(0)
+      session_locked(false), active_desktop(0)
 {
 }
 

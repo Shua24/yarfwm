@@ -27,9 +27,8 @@ struct river_window_v1;
 // before registering. A binding is not live until enable is sent during a
 // manage sequence, so that happens in apply_manage().
 //
-// Actions whose feature has not landed yet are reported once at startup and
-// skipped, as decided for this batch: a skipped binding is never registered, so
-// its key keeps reaching the focused window.
+// Unknown action names are reported once at startup and skipped: a skipped
+// binding is never registered, so its key keeps reaching the focused window.
 //
 // Dynamic memory: the parsed definitions and the per-seat binding entries are
 // heap-allocated while the configuration is read and freed in terminate().
@@ -63,7 +62,8 @@ class Keybind
 	// View::window_manager_manage_start(), before Seat::apply_manage().
 	void forget_removed_seats();
 
-      private:
+	// The parsing surface is public so the unit tests can exercise it
+	// without a Wayland connection.
 	enum ActionKind {
 		action_none = 0,
 		action_spawn,
@@ -85,10 +85,7 @@ class Keybind
 		action_resize_height,
 		action_focus_desktop,
 		action_move_window_to_desktop,
-		// Recognised, but river's protocol has no way to carry it out.
-		// Reported once at startup so the gap is visible rather than
-		// silent.
-		action_unavailable,
+		action_move_pointer,
 	};
 
 	struct Action {
@@ -101,6 +98,14 @@ class Keybind
 		int amount;
 	};
 
+	static Action parse_action(const std::string &action_name,
+				   const std::vector<std::string> &arguments);
+	static std::vector<std::string> read_arguments(const Json::Value &bind);
+	static uint32_t resolve_keysym(const std::string &key_name);
+	static uint32_t resolve_modifiers(const Json::Value &bind,
+					  bool *resolved);
+
+      private:
 	// One usable entry from the config's keybinds array.
 	struct Definition {
 		uint32_t keysym;
@@ -126,13 +131,6 @@ class Keybind
 				     struct river_xkb_binding_v1 *binding);
 	static void binding_stop_repeat(void *data,
 					struct river_xkb_binding_v1 *binding);
-
-	static Action parse_action(const std::string &action_name,
-				   const std::vector<std::string> &arguments);
-	static std::vector<std::string> read_arguments(const Json::Value &bind);
-	static uint32_t resolve_keysym(const std::string &key_name);
-	static uint32_t resolve_modifiers(const Json::Value &bind,
-					  bool *resolved);
 	// A readable name for an action kind, used when reporting that a
 	// binding was refused while the session is locked.
 	static const char *action_name(ActionKind kind);

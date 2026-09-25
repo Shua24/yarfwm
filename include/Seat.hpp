@@ -141,6 +141,12 @@ class Seat
 	// only; called from View::window_manager_manage_start().
 	void apply_manage();
 
+	// Keyboard-driven pointer movement: move the pointer by a step in a
+	// direction. river_seat_v1.pointer_warp is manage-sequence-only, so
+	// the offset is recorded and sent by apply_manage().
+	void move_pointer(struct river_seat_v1 *river_seat, int32_t delta_x,
+			  int32_t delta_y);
+
 	// Start an interactive pointer move or resize. Called from the
 	// window's pointer_move_requested / pointer_resize_requested handlers,
 	// which pass the window and the seat river named. is_resize picks the
@@ -184,6 +190,10 @@ class Seat
 	// called from apply_manage().
 	void apply_pointer_operation();
 
+	// Send the recorded keyboard pointer warp, if any. Manage sequence
+	// only; called from apply_manage().
+	void apply_pointer_warp();
+
 	static const int max_seats = 4;
 
 	enum LayerSurfaceFocus {
@@ -212,6 +222,18 @@ class Seat
 		struct river_window_v1 *previous_focused_window;
 		struct river_window_v1 *pending_focus_window;
 		bool pending_clear_focus;
+
+		// The pointer position river last reported (the
+		// pointer_position event). The keyboard pointer warp moves
+		// relative to it.
+		int32_t pointer_x;
+		int32_t pointer_y;
+		// A keyboard pointer warp waiting for the next manage
+		// sequence: the offset accumulated since the last reported
+		// position.
+		int32_t pointer_warp_delta_x;
+		int32_t pointer_warp_delta_y;
+		bool pointer_warp_pending;
 	};
 
 	SeatEntry *find_entry(struct river_seat_v1 *river_seat);

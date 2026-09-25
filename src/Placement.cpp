@@ -74,3 +74,40 @@ double direction_score(const Rectangle &source, const Rectangle &candidate,
 
 	return along + sideways / 2.0;
 }
+
+// The desktop wrap, moved verbatim from ViewDesktops.cpp so the wrap-around
+// rule can be unit tested. Positive modulo: a switch left from desktop 0 must
+// land on the last desktop, not on -1.
+int wrap_desktop(int desktop, int count)
+{
+	if (count <= 0) {
+		return 0;
+	}
+	desktop %= count;
+	if (desktop < 0) {
+		desktop += count;
+	}
+	return desktop;
+}
+
+// The dimension-hint clamp, moved verbatim from ViewWindowState.cpp. Zero
+// means "no preference" for that value, which is how the protocol spells it:
+// "A value of 0 indicates that the window has no preference for that value."
+// The bounds are passed as values so this stays a free function.
+void apply_dimension_hints(int32_t min_width, int32_t min_height,
+			   int32_t max_width, int32_t max_height,
+			   Rectangle &geometry)
+{
+	if (min_width > 0 && geometry.width < min_width) {
+		geometry.width = min_width;
+	}
+	if (min_height > 0 && geometry.height < min_height) {
+		geometry.height = min_height;
+	}
+	if (max_width > 0 && geometry.width > max_width) {
+		geometry.width = max_width;
+	}
+	if (max_height > 0 && geometry.height > max_height) {
+		geometry.height = max_height;
+	}
+}

@@ -25,10 +25,14 @@ Pre-1.0, under active development. Verified live on 2026-09-23 against river
   (verified with `foot`)
 - Supports layer shell: wallpaper clients and bars map correctly, including
   exclusive-zone tracking (verified with `swaybg`, `wbg` and `waybar`)
-- Keyboard bindings: the config's 43 binds are parsed, the 15 that name
-  implemented actions register per seat, and spawn / close / directional focus /
-  focus-previous / quit / exit-session fire on injected key events (verified with
-  `wtype`; see `docs/keybinds.md`)
+- Keyboard bindings: all 45 binds in the default config register per seat
+  (nothing is skipped), and spawn / close / directional focus / focus-previous /
+  quit / exit-session fire on injected key events (verified with `wtype`; see
+  `docs/keybinds.md`)
+- Keyboard pointer movement: the four `move_pointer_*` binds warp the pointer
+  through `river_seat_v1.pointer_warp`, one 32px step per press, held keys
+  repeating (verified with injected key events against a parked virtual
+  pointer; see `docs/keybinds.md`)
 - Key repeat: a held focus binding repeats (verified with `wtype` holding
   `Super+Right` for 1.5s → 29 repeats; a held `spawn` still fires once)
 - Pointer focus: click-to-focus and focus-follows-mouse both focus the window
@@ -49,11 +53,11 @@ Pre-1.0, under active development. Verified live on 2026-09-23 against river
 
 Not implemented yet:
 
-- The 18 actions the default config names but the engine does not implement —
-  logged once and skipped at startup (`docs/keybinds.md`)
-- Window decorations — borders and focus rings are declared in the config but
-  nothing draws them yet
-- Window rules — `window_rules` is parsed but never applied
+- Window decorations — yarfwm draws none and asks for none: river's default
+  (client-side decorations) applies, and honoring a server-side decoration hint
+  would mean drawing the decoration, which needs a renderer yarfwm does not
+  have. Compositor-drawn borders (`set_borders`) are a candidate for a later
+  batch.
 
 ## Requirements
 
@@ -255,16 +259,29 @@ Note on input: headless river still advertises a seat (`wl_seat` plus
 `river_xkb_bindings_v1`), so keyboard bindings can be exercised there by
 injecting synthetic key events with a virtual-keyboard client such as `wtype`
 (not packaged on this machine; it builds from source in a scratch directory).
-Pointer paths (click-to-focus) have not been exercised headless yet — treat
-those as needing a real session until a pointer-injection recipe exists.
+Pointer paths work headless too: river advertises
+`zwlr_virtual_pointer_manager_v1`, and a small injector built against
+`zwlr-virtual-pointer-unstable-v1.xml` can park or click the pointer at any
+position, which is how click-to-focus, focus-follows-mouse and the keyboard
+pointer warp were verified.
 
 ### Tests
 
-GoogleTest is available on the development machine (1.18.0), and
-`meson_options.txt` declares a `test` option — but **no `test()` call is wired
-up yet**, so `-Dtest=true` currently does nothing. Contributions that add a test
-suite should hook it up there. Until then, verification is manual and follows
-the headless recipe above.
+`meson_options.txt` declares a `test` option; with it enabled the unit suite
+builds and runs:
+
+```
+meson setup build -Dtest=true
+ninja -C build
+meson test -C build
+```
+
+Five suites run without a Wayland connection: `placement` and
+`placement_helpers` (cascade step, directional scoring, desktop wrap,
+dimension-hint clamping), `config` (parsing, removed-key tolerance, the
+first-start default write), `keybind_parse` (keysym folding, modifier masks,
+action names) and `view_lock` (the session lock guard). Everything else is
+verified with the headless recipe above.
 
 ### Adding a protocol
 

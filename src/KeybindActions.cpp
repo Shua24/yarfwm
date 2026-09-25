@@ -76,8 +76,8 @@ const char *Keybind::action_name(ActionKind kind)
 		return "focus_desktop";
 	case action_move_window_to_desktop:
 		return "move_window_to_desktop";
-	case action_unavailable:
-		return "unavailable";
+	case action_move_pointer:
+		return "move_pointer";
 	case action_none:
 	default:
 		return "none";
@@ -240,6 +240,30 @@ void Keybind::perform(int definition_index, struct river_seat_v1 *river_seat)
 		}
 		return;
 	}
+	case action_move_pointer: {
+		// Keyboard-driven pointer movement, one step per press. The
+		// step matches the cascade step, so the two feel alike.
+		const int32_t pointer_step = 32;
+		int32_t delta_x = 0;
+		int32_t delta_y = 0;
+		switch (action.direction) {
+		case focus_direction_left:
+			delta_x = -pointer_step;
+			break;
+		case focus_direction_right:
+			delta_x = pointer_step;
+			break;
+		case focus_direction_up:
+			delta_y = -pointer_step;
+			break;
+		case focus_direction_down:
+		default:
+			delta_y = pointer_step;
+			break;
+		}
+		seat->move_pointer(river_seat, delta_x, delta_y);
+		return;
+	}
 	case action_toggle_maximize: {
 		struct river_window_v1 *target =
 		    seat->focused_window(river_seat);
@@ -354,11 +378,6 @@ void Keybind::perform(int definition_index, struct river_seat_v1 *river_seat)
 		}
 		return;
 	}
-	case action_unavailable:
-		// Reported once at startup by the parser; reaching here would
-		// mean the binding was registered anyway, which the parser
-		// prevents.
-		return;
 	case action_none:
 	default:
 		return;

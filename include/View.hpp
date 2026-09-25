@@ -135,14 +135,14 @@ class View
 	// Virtual desktops. River has no desktop concept at all — there is no
 	// workspace, tag or desktop interface in the protocol — so yarfwm
 	// implements them the only way the protocol allows: the windows that
-	// are not on the active desktop are hidden with
-	// river_window_v1.hide. See set_decoration_mode() for the related note
-	// about what river does and does not provide.
+	// are not on the active desktop are hidden with river_window_v1.hide.
 	void focus_desktop(struct river_seat_v1 *river_seat, int delta);
 	void move_window_to_desktop(struct river_window_v1 *window, int delta);
 
-	// Apply a decoration hint from river by sending use_csd or use_ssd.
-	// Both are either-sequence requests.
+	// Handle a decoration hint from river. Nothing is sent back, on
+	// purpose: river's default when neither use_csd nor use_ssd is sent
+	// is client-side decorations, and honouring a server-side hint would
+	// mean drawing the decoration here, which yarfwm does not do.
 	void apply_decoration_hint(struct river_window_v1 *window,
 				   uint32_t hint);
 
@@ -154,6 +154,15 @@ class View
 	// layer refuses everything except quit and exit_session while true, so
 	// a binding cannot fight the lock screen for focus.
 	bool session_is_locked() const { return session_locked; }
+
+	// The session lock events, public so the unit tests can drive the
+	// guard lifecycle without a Wayland connection. The listener wiring
+	// still happens in initialize().
+	static void
+	window_manager_session_locked(void *data,
+				      struct river_window_manager_v1 *manager);
+	static void window_manager_session_unlocked(
+	    void *data, struct river_window_manager_v1 *manager);
 
       private:
 	struct Window {
@@ -205,11 +214,6 @@ class View
 		bool always_on_top_sent;
 		bool minimized;
 		bool minimized_sent;
-
-		// The decoration hint river last reported, and the request sent
-		// for it. Values come from river_window_v1_decoration_hint.
-		uint32_t decoration_hint;
-		bool decoration_sent;
 
 		// Which virtual desktop this window belongs to. Desktops are a
 		// window manager invention here, not a protocol feature.
@@ -283,12 +287,6 @@ class View
 	static void
 	window_manager_finished(void *data,
 				struct river_window_manager_v1 *manager);
-	static void
-	window_manager_session_locked(void *data,
-				      struct river_window_manager_v1 *manager);
-	static void window_manager_session_unlocked(
-	    void *data, struct river_window_manager_v1 *manager);
-
 	// Window events. Every slot must be non-NULL: libwayland aborts the
 	// process when an event arrives for a NULL listener slot.
 	static void window_closed(void *data, struct river_window_v1 *window);
@@ -380,22 +378,18 @@ class View
 	// The session is locked (a lock screen holds the keyboard). While
 	// locked, every action except quit and exit_session is refused: acting
 	// on a key binding would fight the lock screen for focus. River sends
-	// session_locked at startup too if the session is already locked, so
-	// this is never assumed false for long.
+	// session_locked at startup too if the session is already locked.
+	// window_manager_session_locked sets this and
+	// window_manager_session_unlocked clears it; both must stay in step
+	// with river's events or the key binding guard sticks.
 	bool session_locked;
-
-	// Whether a session_locked or session_unlocked event has been seen, so
-	// the startup case is distinguishable from a genuine transition.
-	bool session_lock_known;
 
 	// The virtual desktop shown right now. Windows whose desktop differs
 	// are hidden with river_window_v1.hide.
 	int active_desktop;
 
 	// How many virtual desktops exist. River has no desktop concept, so
-	// this is yarfwm's own count and the config's "workspaces" list is NOT
-	// used for it: that list holds xkb keyboard layout names
-	// (["ID","JP","RU","US","DE/CH"]) and never described desktops.
+	// this is yarfwm's own fixed count.
 	static const int desktop_count = 5;
 };
 

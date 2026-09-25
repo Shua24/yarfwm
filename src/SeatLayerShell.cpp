@@ -23,6 +23,12 @@ void Seat::layer_shell_seat_focus_exclusive(
 		     "Yarfwm: layer surface took exclusive keyboard focus\n");
 }
 
+// A bar or dock asking for the keyboard without taking it away from
+// windows: recorded so the focus state is complete, and deliberately not
+// acted on. River's XML (river-layer-shell-v1 focus_non_exclusive): "The
+// window manager continues to control focus and may choose to focus a
+// different window/shell surface at any time." att_wm records it the same
+// way and acts only on focus_none (Seat.zig:407-408).
 void Seat::layer_shell_seat_focus_non_exclusive(
     void *data, struct river_layer_shell_seat_v1 *layer_shell_seat)
 {

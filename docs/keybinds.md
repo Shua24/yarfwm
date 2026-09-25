@@ -23,7 +23,7 @@ entry has a `modifiers` array, a `key` name, and an `action`:
   Single letters are matched case-insensitively; see the note below.
 - `action` is one of the names in the tables below.
 - `args` is the argument vector for `spawn` (program first, then its
-  arguments). Other actions ignore it.
+  arguments). The resize actions read their percentage from it too.
 
 Keysyms are matched against the keyboard's **base layer**, "as if modifiers
 didn't change keysyms": river reports `Super+Shift+r` as keysym `r`, not `R`.
@@ -32,6 +32,18 @@ yarfwm therefore registers every ASCII A-Z binding in its lowercase form, so
 
 Bindings are registered per seat (river scopes a binding to a seat) and only
 `enable` inside a manage sequence, which is when river accepts that request.
+
+A run with the default config logs, at startup:
+
+```
+Yarfwm: 45 key bindings parsed
+Yarfwm: registered 45/45 key bindings on a seat
+```
+
+Every entry in the default config names an implemented action, so nothing is
+skipped. An unknown action name in a hand-edited config is reported once
+(`Yarfwm: keybind action not implemented yet, skipping: <name>`) and its key is
+left alone, so it still reaches the focused window.
 
 ### Held keys (repeat)
 
@@ -44,13 +56,15 @@ Which actions repeat:
 
 - `focus_window_left` / `_right` / `_up` / `_down` repeat by default, so a held
   key walks the focus across the desktop.
+- `move_pointer_left` / `_right` / `_up` / `_down` repeat by default, so a held
+  key walks the pointer.
 - Everything else runs once per press. Spawning a program or closing a window
   on every repeat tick would be wrong.
 - A per-binding `"repeat": true` or `"repeat": false` in `config.json` wins over
   the default, for both directions.
 
-An explicit `"repeat"` field looks like this (the default config already
-carries `"repeat": false` on `toggle_expose` and `close_window`):
+An explicit `"repeat"` field looks like this (the default config carries
+`"repeat": false` on `close_window`, which is already the default for it):
 
 ```json
 { "modifiers": ["Super"], "key": "X", "action": "close_window", "repeat": false }
@@ -63,6 +77,10 @@ Pressing any other key while a repeat is running stops it (river sends
 
 ### Implemented
 
+Every action below is implemented and registers when the default config names
+it. `minimize_window` and `restore_minimized_window` are implemented but not
+bound by the default config; bind them by hand if wanted.
+
 | Action | Effect |
 |---|---|
 | `spawn` | Fork and exec `args` (double fork; the child is reparented to init). |
@@ -71,6 +89,20 @@ Pressing any other key while a repeat is running stops it (river sends
 | `exit_session` | Ask river to end the Wayland session and exit the compositor (`river_window_manager_v1.exit_session`). Every client in the session is disconnected, including this window manager. |
 | `focus_window_left` / `_right` / `_up` / `_down` | Move focus to the nearest window in that direction, measured centre to centre. |
 | `focus_window_previous` | Return focus to the previously focused window. |
+| `move_window_left` / `_right` / `_up` / `_down` | Move the focused window by one 32px step in that direction. |
+| `move_pointer_left` / `_right` / `_up` / `_down` | Move the pointer by one 32px step in that direction (`river_seat_v1.pointer_warp`). River clamps the target into the outputs, so a warp past the screen edge stops at the edge. |
+| `focus_desktop_next` / `_previous` | Switch to the next/previous virtual desktop. |
+| `move_window_to_desktop_next` / `_previous` | Send the focused window to the next/previous virtual desktop. |
+| `toggle_always_on_top` | Keep the focused window above the others (`place_top`/`place_bottom`). |
+| `toggle_maximize` | Toggle the focused window's maximized state. |
+| `fullscreen_window` | Toggle fullscreen for the focused window, on the output it mostly sits on. |
+| `fit_to_output` | Resize the focused window to the placement area (the output minus bars/docks). |
+| `center_window` | Centre the focused window in the placement area. |
+| `center_all_windows` | Centre every window in the placement area. |
+| `set_window_width` | Grow/shrink the focused window's width by the percentage in `args` (`"-10%"`, `"+10%"`). |
+| `set_window_height` | Same for height. |
+| `minimize_window` | Hide the focused window (the protocol's own answer to minimize). Not bound by default. |
+| `restore_minimized_window` | Show the most recently minimized window again. Not bound by default. |
 
 `quit` and `exit_session` are deliberately separate. River's protocol asks that
 `exit_session` be sent only when the user explicitly wants the session to end,
@@ -107,41 +139,23 @@ the fallback survives the lock and the keyboard comes back to a real window.
 
 Pointer events: with `input.focus_follows_mouse` true (the default) moving the
 pointer into a window focuses it; clicking a window focuses it regardless of
-that setting.
+that setting. The `move_pointer_*` actions move the pointer itself, which can
+focus a window under it through that same path.
 
 A close request is a request, not a command: a window may refuse it (terminal
 emulators ask for confirmation when a process is still running). Pressing the
 close binding again re-sends the request to the focused window.
-
-### Recognised but not implemented
-
-The engine accepts these names at parse time and logs
-`Yarfwm: keybind action not implemented yet, skipping: <name>` once per action
-at startup. The key is **not** consumed, so it still reaches the focused window.
-
-| Action | Bound keys (default config) |
-|---|---|
-| `move_window_left` / `_right` / `_up` / `_down` | `Super+Ctrl` + arrows / HJKL |
-| `focus_desktop_next` / `_previous` | `Super` + `Page_Down`/`Page_Up`/U/I |
-| `move_window_to_desktop_next` / `_previous` | `Super+Ctrl` + `Page_Down`/`Page_Up`/U/I |
-| `toggle_always_on_top` | `Super+V` |
-| `toggle_maximize` | `Super+F` |
-| `fullscreen_window` | `Super+Shift+F` |
-| `fit_to_output` | `Super+Ctrl+F` |
-| `center_window` | `Super+C` |
-| `center_all_windows` | `Super+Ctrl+C` |
-| `set_window_width` / `set_window_height` | `Super` / `Super+Shift` + `Minus`/`Equal` |
-| `show_hotkey_overlay` | `Super+Slash` |
-| `toggle_expose` | `Super+O` |
 
 ## Changes to the inherited default config
 
 The default config (`data/config.json.in`) came from a tiling window manager's
 session. Batch 2 renamed its tiling verbs to floating equivalents and deleted
 the binds that have no meaning in a floating window manager, because the JSON
-format has no comments and could not explain itself. This file is that record.
+format has no comments and could not explain itself. The protocol-completion
+pass then deleted the two binds whose features river's protocol cannot carry
+out. This file is that record.
 
-### Renamed (16)
+### Renamed (15)
 
 The key and modifiers were kept; only the action name changed.
 
@@ -161,20 +175,24 @@ The key and modifiers were kept; only the action name changed.
 | `move_column_to_workspace_up` | `move_window_to_desktop_previous` |
 | `set_column_width` | `set_window_width` |
 | `switch_focus_between_floating_and_tiling` | `focus_window_previous` |
-| `toggle_overview` | `toggle_expose` |
 | `toggle_window_floating` | `toggle_always_on_top` |
 
-### Deleted (5 binds)
+### Deleted (7 binds)
 
-These actions have no equivalent in the river window management protocol, which
-has no workspaces and no monitor power control. Deleting the bind leaves the key
-free for the client instead of consuming it.
+These actions have no equivalent in the river window management protocol. The
+first five were deleted in Batch 2; the last two in the protocol-completion
+pass, when the config was brought in line with the constraint that every key
+must be consumable under the protocol. Deleting the bind leaves the key free
+for the client instead of consuming it.
 
 | Action | Was bound to | Why |
 |---|---|---|
 | `move_workspace_up` | `Super+Shift+Page_Up`, `Super+Shift+I` | no workspaces in the protocol |
 | `move_workspace_down` | `Super+Shift+Page_Down`, `Super+Shift+U` | no workspaces in the protocol |
 | `power_off_monitors` | `Super+Shift+P` | no monitor power control in the protocol |
+| `toggle_expose` | `Super+O` | an expose grid needs a picture of every window; the protocol has no screenshot, thumbnail or scaling request |
+| `show_hotkey_overlay` | `Super+Slash` | the overlay needs a window-manager-owned renderer; yarfwm has none |
 
-Net effect: 47 binds became 43 — 42 from the floating renames and deletions,
-plus `Super+Shift+E` (`exit_session`) added when that action landed.
+Net effect: 47 inherited binds became 45 — 15 renames in place, 7 deleted, 5
+added (`Super+Shift+E` for `exit_session` when that action landed, and the four
+`move_pointer_*` binds when the keyboard pointer warp landed).

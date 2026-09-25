@@ -104,16 +104,18 @@ Keybind::Action Keybind::parse_action(const std::string &action_name,
 	} else if (action_name == "move_window_to_desktop_previous") {
 		action.kind = action_move_window_to_desktop;
 		action.amount = -1;
-	} else if (action_name == "toggle_expose" ||
-		   action_name == "show_hotkey_overlay") {
-		// Both need to draw: an expose grid needs a scaled picture of
-		// every window, and river gives the window manager no way to
-		// obtain window content at all (there is no screenshot,
-		// thumbnail or scaling request, and capture_sessions only
-		// reports a count). The overlay needs its own rendered
-		// buffer. Recognised so the gap is reported instead of
-		// silently doing nothing.
-		action.kind = action_unavailable;
+	} else if (action_name == "move_pointer_left") {
+		action.kind = action_move_pointer;
+		action.direction = focus_direction_left;
+	} else if (action_name == "move_pointer_right") {
+		action.kind = action_move_pointer;
+		action.direction = focus_direction_right;
+	} else if (action_name == "move_pointer_up") {
+		action.kind = action_move_pointer;
+		action.direction = focus_direction_up;
+	} else if (action_name == "move_pointer_down") {
+		action.kind = action_move_pointer;
+		action.direction = focus_direction_down;
 	}
 
 	return action;

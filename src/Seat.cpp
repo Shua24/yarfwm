@@ -28,8 +28,6 @@ bool Seat::initialize(Server *server, Display *display, Config &config)
 	(void)server;
 	(void)display;
 
-	// input is authoritative: the layout block used to carry a second copy
-	// of this key and the default config dropped it.
 	focus_follows_mouse =
 	    config.input.get("focus_follows_mouse", true).asBool();
 	return true;
@@ -375,6 +373,7 @@ void Seat::apply_manage()
 		}
 	}
 
+	apply_pointer_warp();
 	apply_pointer_operation();
 }
 
@@ -461,8 +460,14 @@ void Seat::river_seat_pointer_position(void *data,
 				       struct river_seat_v1 *river_seat,
 				       int32_t x, int32_t y)
 {
-	(void)data;
-	(void)river_seat;
-	(void)x;
-	(void)y;
+	// River sends this in every manage sequence (unless the position is
+	// unchanged). The keyboard pointer warp moves relative to the last
+	// reported position, so it is kept per seat.
+	Seat *seat = static_cast<Seat *>(data);
+	SeatEntry *entry = seat->find_entry(river_seat);
+	if (!entry) {
+		return;
+	}
+	entry->pointer_x = x;
+	entry->pointer_y = y;
 }

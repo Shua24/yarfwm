@@ -43,19 +43,24 @@ void View::window_manager_session_locked(
 	View *view = static_cast<View *>(data);
 	(void)manager;
 	view->session_locked = true;
-	view->session_lock_known = true;
 }
 
 void View::window_manager_session_unlocked(
     void *data, struct river_window_manager_v1 *manager)
 {
+	// The session is usable again: clear the lock guard. The guard is
+	// what the key binding layer checks before every action, so a flag
+	// left set here silently refuses every binding for the rest of the
+	// run (att_wm clears its own flag the same way, Wm.zig:450-451).
+	View *view = static_cast<View *>(data);
+	(void)manager;
+	view->session_locked = false;
+
 	// The lock surface held the keyboard and river dropped it again on
 	// unlock, but our recorded focus never changed, so nothing looks
 	// stale. Without re-issuing it the seat sits there with no window
 	// focused until the user clicks one (att_wm's restoreFocus does the
 	// same).
-	View *view = static_cast<View *>(data);
-	(void)manager;
 	if (view->seat) {
 		view->seat->restore_focus();
 	}
