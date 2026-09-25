@@ -1,8 +1,8 @@
 // Unit tests for the session lock guard.
 //
 // A lock/unlock cycle must leave session_is_locked() false: the key binding
-// layer refuses every action except quit and exit_session while the guard is
-// set, so a flag that is set but never cleared silently kills every binding
+// layer refuses every action except exit_session while the guard is set, so
+// a flag that is set but never cleared silently kills every binding
 // for the rest of the run. That regression shipped once (the unlocked event
 // never cleared the flag); this test is the fast guard against it, and the
 // live probe in the session notes is the end-to-end proof.

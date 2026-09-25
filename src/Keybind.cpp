@@ -103,8 +103,8 @@ bool Keybind::initialize(Server *server, Display *display, Seat *seat,
 
 		// Held-key repeat. An explicit "repeat" in the config wins;
 		// otherwise the directional focus moves and the keyboard
-		// pointer warps repeat. Spawning a program or quitting on
-		// every repeat tick would be wrong.
+		// pointer warps repeat. Spawning a program on every repeat
+		// tick would be wrong.
 		const Json::Value &repeat_value = bind["repeat"];
 		definition.repeats =
 		    repeat_value.isBool()

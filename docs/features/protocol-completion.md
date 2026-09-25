@@ -21,10 +21,10 @@ Two rules drove the pass:
 
 ## The state it produced
 
-- **Actions:** 29 distinct action names in the default config, all implemented,
-  all registered; 45 binds parsed and 45 registered, nothing skipped. The
-  startup line reports it: `Yarfwm: 45 key bindings parsed`,
-  `Yarfwm: registered 45/45 key bindings on a seat`.
+- **Actions:** 28 distinct action names in the default config, all implemented,
+  all registered; 44 binds parsed and 44 registered, nothing skipped. The
+  startup line reports it: `Yarfwm: 44 key bindings parsed`,
+  `Yarfwm: registered 44/44 key bindings on a seat`.
 - **Stubs:** 23 empty handler bodies at the start → **8** now, and each
   remaining one is inert by design (a listener slot that must stay non-NULL, or
   an event with no policy attached). The `pointer_position` handler — the one
@@ -38,7 +38,7 @@ Two rules drove the pass:
   features (compositor-drawn borders via `set_borders`); some have no consumer
   under yarfwm's policy.
 - **The config-constraint schema.** The config is now exactly
-  `{ "input": { "focus_follows_mouse": true }, "keybinds": [ ...45... ] }` —
+  `{ "input": { "focus_follows_mouse": true }, "keybinds": [ ...44... ] }` —
   two keys, both consumed. Everything else the inherited config carried
   (`layout`, `outputs`, `workspaces`, `spawn_at_startup`, `window_rules`,
   `prefer_no_csd`, `screenshot_path`, the inert input sub-blocks) was read by

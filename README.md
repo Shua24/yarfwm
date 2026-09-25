@@ -25,9 +25,9 @@ Pre-1.0, under active development. Verified live on 2026-09-23 against river
   (verified with `foot`)
 - Supports layer shell: wallpaper clients and bars map correctly, including
   exclusive-zone tracking (verified with `swaybg`, `wbg` and `waybar`)
-- Keyboard bindings: all 45 binds in the default config register per seat
+- Keyboard bindings: all 44 binds in the default config register per seat
   (nothing is skipped), and spawn / close / directional focus / focus-previous /
-  quit / exit-session fire on injected key events (verified with `wtype`; see
+  exit-session fires on injected key events (verified with `wtype`; see
   `docs/keybinds.md`)
 - Keyboard pointer movement: the four `move_pointer_*` binds warp the pointer
   through `river_seat_v1.pointer_warp`, one 32px step per press, held keys

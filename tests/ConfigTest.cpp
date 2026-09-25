@@ -78,7 +78,7 @@ TEST_F(ConfigTest, ReadsTheLiveKeys)
 	const std::string path =
 	    write_file(scratch, "config.json",
 		       "{\"input\": {\"focus_follows_mouse\": false},"
-		       " \"keybinds\": [{\"action\": \"quit\"}]}");
+		       " \"keybinds\": [{\"action\": \"exit_session\"}]}");
 
 	Config config;
 	ASSERT_TRUE(config.load(path));
@@ -119,7 +119,7 @@ TEST_F(ConfigTest, IgnoresKeysThatLeftTheSchema)
 		       " \"window_rules\": [], \"prefer_no_csd\": true,"
 		       " \"screenshot_path\": \"/tmp/shot.png\","
 		       " \"input\": {\"focus_follows_mouse\": true},"
-		       " \"keybinds\": [{\"action\": \"quit\"}]}");
+		       " \"keybinds\": [{\"action\": \"exit_session\"}]}");
 
 	Config config;
 	ASSERT_TRUE(config.load(path));
@@ -132,7 +132,7 @@ TEST_F(ConfigTest, ReloadingStaysStable)
 {
 	const std::string path =
 	    write_file(scratch, "config.json",
-		       "{\"keybinds\": [{\"action\": \"quit\"},"
+		       "{\"keybinds\": [{\"action\": \"exit_session\"},"
 		       " {\"action\": \"spawn\"}]}");
 	Config config;
 	ASSERT_TRUE(config.load(path));
@@ -152,7 +152,7 @@ TEST_F(ConfigTest, MissingFileWritesTheEmbeddedDefault)
 	Config written;
 	ASSERT_TRUE(written.load(default_config_path()));
 	ASSERT_TRUE(written.keybinds.isArray());
-	EXPECT_EQ(written.keybinds.size(), 45U);
+	EXPECT_EQ(written.keybinds.size(), 44U);
 	EXPECT_TRUE(written.input.get("focus_follows_mouse", true).asBool());
 }
 
@@ -163,7 +163,7 @@ TEST_F(ConfigTest, MalformedFileFallsBackToTheDefault)
 	Config config;
 	ASSERT_TRUE(config.load(path));
 	ASSERT_TRUE(config.keybinds.isArray());
-	EXPECT_EQ(config.keybinds.size(), 45U);
+	EXPECT_EQ(config.keybinds.size(), 44U);
 }
 
 } // namespace

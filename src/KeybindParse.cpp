@@ -40,8 +40,6 @@ Keybind::Action Keybind::parse_action(const std::string &action_name,
 		action.kind = action_spawn;
 	} else if (action_name == "close_window") {
 		action.kind = action_close_window;
-	} else if (action_name == "quit") {
-		action.kind = action_quit;
 	} else if (action_name == "exit_session") {
 		action.kind = action_exit_session;
 	} else if (action_name == "focus_window_left") {

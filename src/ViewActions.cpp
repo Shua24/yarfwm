@@ -46,8 +46,6 @@ void View::request_close(struct river_window_v1 *window)
 	window_entry->close_sent = false;
 }
 
-void View::request_shutdown() { shutdown_requested = true; }
-
 void View::set_user_geometry(struct river_window_v1 *window,
 			     const Rectangle &geometry)
 {

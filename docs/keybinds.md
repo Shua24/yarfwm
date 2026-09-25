@@ -36,14 +36,17 @@ Bindings are registered per seat (river scopes a binding to a seat) and only
 A run with the default config logs, at startup:
 
 ```
-Yarfwm: 45 key bindings parsed
-Yarfwm: registered 45/45 key bindings on a seat
+Yarfwm: 44 key bindings parsed
+Yarfwm: registered 44/44 key bindings on a seat
 ```
 
 Every entry in the default config names an implemented action, so nothing is
 skipped. An unknown action name in a hand-edited config is reported once
 (`Yarfwm: keybind action not implemented yet, skipping: <name>`) and its key is
-left alone, so it still reaches the focused window.
+left alone, so it still reaches the focused window. A config that still binds
+`quit` (the default config is written only on first startup, so an older copy
+keeps the entry) takes that same path: the name is unknown, the bind is
+reported and its key is left alone.
 
 ### Held keys (repeat)
 
@@ -85,7 +88,6 @@ bound by the default config; bind them by hand if wanted.
 |---|---|
 | `spawn` | Fork and exec `args` (double fork; the child is reparented to init). |
 | `close_window` | Ask river to close the focused window. |
-| `quit` | Stop the window manager and exit. River does **not** exit when its window manager disconnects, so this leaves the compositor running with no window manager; use `exit_session` to end the session. |
 | `exit_session` | Ask river to end the Wayland session and exit the compositor (`river_window_manager_v1.exit_session`). Every client in the session is disconnected, including this window manager. |
 | `focus_window_left` / `_right` / `_up` / `_down` | Move focus to the nearest window in that direction, measured centre to centre. |
 | `focus_window_previous` | Return focus to the previously focused window. |
@@ -104,13 +106,13 @@ bound by the default config; bind them by hand if wanted.
 | `minimize_window` | Hide the focused window (the protocol's own answer to minimize). Not bound by default. |
 | `restore_minimized_window` | Show the most recently minimized window again. Not bound by default. |
 
-`quit` and `exit_session` are deliberately separate. River's protocol asks that
-`exit_session` be sent only when the user explicitly wants the session to end,
-not on ordinary window manager termination, so `quit` keeps its meaning as "stop
-the window manager" and the session-ending request has its own binding
-(`Super+Shift+E` by default). Under a display manager the distinction is what
-gets you out: `quit` on its own leaves river running with no window manager and
-a blank screen.
+`exit_session` is the only action that ends the session, and it is bound to
+`Super+Shift+E` by default. Yarfwm has no action that stops the window manager
+while leaving the compositor running: river does not exit when its window
+manager disconnects, so such an action would strand the session with no window
+manager — under a display manager, with no way out but a VT switch. River's
+protocol asks that `exit_session` be sent only when the user explicitly wants
+the session to end, and the single binding does exactly that.
 
 When the focused window disappears, focus falls back to the previously focused
 survivor, then to any surviving window; only when no window is left does the
@@ -177,13 +179,16 @@ The key and modifiers were kept; only the action name changed.
 | `switch_focus_between_floating_and_tiling` | `focus_window_previous` |
 | `toggle_window_floating` | `toggle_always_on_top` |
 
-### Deleted (7 binds)
+### Deleted (8 binds)
 
-These actions have no equivalent in the river window management protocol. The
-first five were deleted in Batch 2; the last two in the protocol-completion
-pass, when the config was brought in line with the constraint that every key
-must be consumable under the protocol. Deleting the bind leaves the key free
-for the client instead of consuming it.
+The first seven have no equivalent in the river window management protocol: the
+first five were deleted in Batch 2; `toggle_expose` and `show_hotkey_overlay`
+in the protocol-completion pass, when the config was brought in line with the
+constraint that every key must be consumable under the protocol. The eighth,
+`quit`, is a different case — the protocol can carry it out (the window manager
+simply disconnects), but stopping the window manager alone leaves river running
+with no window manager, so the bind went with the action. Deleting a bind
+leaves the key free for the client instead of consuming it.
 
 | Action | Was bound to | Why |
 |---|---|---|
@@ -192,7 +197,8 @@ for the client instead of consuming it.
 | `power_off_monitors` | `Super+Shift+P` | no monitor power control in the protocol |
 | `toggle_expose` | `Super+O` | an expose grid needs a picture of every window; the protocol has no screenshot, thumbnail or scaling request |
 | `show_hotkey_overlay` | `Super+Slash` | the overlay needs a window-manager-owned renderer; yarfwm has none |
+| `quit` | `Super+E` | stopped the window manager and left river running with no window manager; `exit_session` is the only way to end a session from inside the window manager |
 
-Net effect: 47 inherited binds became 45 — 15 renames in place, 7 deleted, 5
+Net effect: 47 inherited binds became 44 — 15 renames in place, 8 deleted, 5
 added (`Super+Shift+E` for `exit_session` when that action landed, and the four
 `move_pointer_*` binds when the keyboard pointer warp landed).

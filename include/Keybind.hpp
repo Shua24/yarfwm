@@ -68,7 +68,6 @@ class Keybind
 		action_none = 0,
 		action_spawn,
 		action_close_window,
-		action_quit,
 		action_exit_session,
 		action_focus_direction,
 		action_focus_previous,

@@ -38,8 +38,8 @@ void View::window_manager_session_locked(
 	// XML: "The window manager may wish to restrict which key bindings are
 	// available while locked or otherwise use this information." A lock
 	// screen owns the keyboard, so acting on a binding would fight it for
-	// focus; the key binding layer refuses everything but quit and
-	// exit_session while this is set.
+	// focus; the key binding layer refuses everything but exit_session
+	// while this is set.
 	View *view = static_cast<View *>(data);
 	(void)manager;
 	view->session_locked = true;

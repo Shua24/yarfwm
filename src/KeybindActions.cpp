@@ -42,8 +42,6 @@ const char *Keybind::action_name(ActionKind kind)
 		return "spawn";
 	case action_close_window:
 		return "close_window";
-	case action_quit:
-		return "quit";
 	case action_exit_session:
 		return "exit_session";
 	case action_focus_direction:
@@ -152,12 +150,11 @@ void Keybind::perform(int definition_index, struct river_seat_v1 *river_seat)
 
 	const Action &action = definitions[definition_index].action;
 
-	// While a lock screen holds the keyboard, only quitting and ending
-	// the session are safe: every other action would fight the lock
-	// screen for focus. This mirrors the reference window manager, and
-	// river documents the lock event as existing exactly for this.
-	if (view->session_is_locked() && action.kind != action_quit &&
-	    action.kind != action_exit_session) {
+	// While a lock screen holds the keyboard, only ending the session
+	// is safe: every other action would fight the lock screen for
+	// focus. This mirrors the reference window manager, and river
+	// documents the lock event as existing exactly for this.
+	if (view->session_is_locked() && action.kind != action_exit_session) {
 		std::fprintf(stderr,
 			     "Yarfwm: %s ignored, the session is locked\n",
 			     action_name(action.kind));
@@ -187,15 +184,6 @@ void Keybind::perform(int definition_index, struct river_seat_v1 *river_seat)
 		}
 		break;
 	}
-	case action_quit:
-		// Stop the window manager only. River does NOT exit when its
-		// window manager disconnects — verified: river stays up with no
-		// window manager and a blank screen — so this leaves the
-		// compositor running. Use exit_session to end the session. This
-		// mirrors att_wm's quit (Wm.zig:1307).
-		std::fprintf(stderr, "Yarfwm: quit\n");
-		view->request_shutdown();
-		return;
 	case action_exit_session:
 		// End the session: river exits the compositor and disconnects
 		// every client, this one included.

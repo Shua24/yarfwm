@@ -34,7 +34,7 @@ guard — is therefore yarfwm's to implement and document.
   produces repeats. Directional focus moves and pointer warps repeat by default;
   a per-bind `"repeat"` field wins.
 - **The lock guard.** While a lock screen holds the keyboard, every action
-  except `quit` and `exit_session` is refused. The guard is set by
+  except `exit_session` is refused. The guard is set by
   `window_manager_session_locked` and **cleared by
   `window_manager_session_unlocked`** — both must stay in step, or every binding
   silently dies after the first lock cycle (see bugs below).
@@ -58,8 +58,8 @@ guard — is therefore yarfwm's to implement and document.
 
 - Directional focus, directional window moves, window state actions (maximize,
   fullscreen, always-on-top, minimize/restore), geometry actions (center, fit,
-  resize by percent), virtual desktop switching, spawn, close, quit and
-  exit_session — 29 distinct actions, all implemented.
+  resize by percent), virtual desktop switching, spawn, close and exit_session —
+  28 distinct actions, all implemented.
 - **Keyboard pointer movement** (`move_pointer_left`/`_right`/`_up`/`_down`,
   `Super+Shift` + arrows): moves the pointer one 32px step per press through
   `river_seat_v1.pointer_warp` (manage-sequence-only, so the offset is recorded

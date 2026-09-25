@@ -105,7 +105,6 @@ TEST(Actions, KnownNamesMapToTheirKinds)
 		  Keybind::action_spawn);
 	EXPECT_EQ(Keybind::parse_action("close_window", {}).kind,
 		  Keybind::action_close_window);
-	EXPECT_EQ(Keybind::parse_action("quit", {}).kind, Keybind::action_quit);
 	EXPECT_EQ(Keybind::parse_action("exit_session", {}).kind,
 		  Keybind::action_exit_session);
 	EXPECT_EQ(Keybind::parse_action("focus_window_previous", {}).kind,
@@ -172,12 +171,13 @@ TEST(Actions, ResizeActionsReadThePercentage)
 
 TEST(Actions, DroppedAndUnknownVerbsAreActionNone)
 {
-	// The two dropped verbs are plain unknown names now: reported once
-	// and skipped like any typo.
+	// The dropped verbs are plain unknown names now: reported once and
+	// skipped like any typo.
 	EXPECT_EQ(Keybind::parse_action("toggle_expose", {}).kind,
 		  Keybind::action_none);
 	EXPECT_EQ(Keybind::parse_action("show_hotkey_overlay", {}).kind,
 		  Keybind::action_none);
+	EXPECT_EQ(Keybind::parse_action("quit", {}).kind, Keybind::action_none);
 	EXPECT_EQ(Keybind::parse_action("no_such_action", {}).kind,
 		  Keybind::action_none);
 }

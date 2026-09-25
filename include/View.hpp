@@ -44,16 +44,12 @@ class View
 	// manage-sequence-only).
 	void request_close(struct river_window_v1 *window);
 
-	// Stop the window manager. The main loop polls should_shutdown() and
-	// exits.
-	void request_shutdown();
-
 	// End the whole Wayland session: ask river to exit the compositor,
 	// which disconnects every client including this one. River does NOT
 	// exit when its window manager disconnects, so this is the only way to
 	// leave a session from inside the window manager. River's XML asks that
 	// this be sent only when the user explicitly wants the session to end,
-	// so it is a separate action from request_shutdown().
+	// so it is never sent on ordinary window manager termination.
 	void request_exit_session();
 
 	// Directional focus: the nearest window whose centre lies in the given
@@ -151,8 +147,8 @@ class View
 	static int desktop_total();
 
 	// Whether a lock screen currently holds the keyboard. The key binding
-	// layer refuses everything except quit and exit_session while true, so
-	// a binding cannot fight the lock screen for focus.
+	// layer refuses everything except exit_session while true, so a
+	// binding cannot fight the lock screen for focus.
 	bool session_is_locked() const { return session_locked; }
 
 	// The session lock events, public so the unit tests can drive the
@@ -376,7 +372,7 @@ class View
 	Keybind *keybind;
 
 	// The session is locked (a lock screen holds the keyboard). While
-	// locked, every action except quit and exit_session is refused: acting
+	// locked, every action except exit_session is refused: acting
 	// on a key binding would fight the lock screen for focus. River sends
 	// session_locked at startup too if the session is already locked.
 	// window_manager_session_locked sets this and
