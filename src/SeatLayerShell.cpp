@@ -47,13 +47,19 @@ void Seat::layer_shell_seat_focus_none(
 	(void)layer_shell_seat;
 	entry->layer_surface_focus = layer_focus_none;
 
-	// Hand the keyboard back to whatever the user was using. Recorded as
-	// intent and applied by Seat::apply_manage(); ask for a manage
-	// sequence so the window is refocused even if river does not send one
-	// of its own after this event (att_wm does the same for its lock
-	// restore).
-	if (entry->focused_window) {
-		entry->pending_focus_window = entry->focused_window;
+	// Hand the keyboard back to whatever the user was using, or was
+	// about to use: a recorded intent (the visible window a minimize
+	// handed focus to while the surface was up, say) wins over the
+	// applied focus, which may point at a window that is hidden now.
+	// Recorded as intent and applied by Seat::apply_manage(); ask for a
+	// manage sequence so the window is refocused even if river does not
+	// send one of its own after this event (att_wm does the same for its
+	// lock restore).
+	struct river_window_v1 *target = entry->pending_focus_window
+					     ? entry->pending_focus_window
+					     : entry->focused_window;
+	if (target) {
+		entry->pending_focus_window = target;
 		entry->pending_clear_focus = false;
 	}
 	if (entry->owner && entry->owner->view) {

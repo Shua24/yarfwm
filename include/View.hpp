@@ -89,10 +89,16 @@ class View
 			     Rectangle *geometry) const;
 
 	// The window to hand the keyboard to when the focused window is
-	// destroyed and the seat has no previous window left to return to.
-	// yarfwm is a single floating cascade with no per-output or per-tag
-	// visibility, so every tracked window is a candidate.
-	struct river_window_v1 *first_window() const;
+	// destroyed or stops being visible and the seat has no previous
+	// window left to return to. Only windows on the active desktop are
+	// candidates: a hidden window must never take the keyboard.
+	struct river_window_v1 *first_visible_window() const;
+
+	// Whether a window is on screen right now: it is not minimized and
+	// its desktop is the active one. Every focus hand-off filters its
+	// target through this, so the keyboard never lands on a hidden
+	// window.
+	bool window_is_visible(struct river_window_v1 *window) const;
 
 	// Window state actions. Each is reachable two ways: from a key binding,
 	// and from the window's own request event (a client-side decoration
@@ -132,8 +138,15 @@ class View
 	// workspace, tag or desktop interface in the protocol — so yarfwm
 	// implements them the only way the protocol allows: the windows that
 	// are not on the active desktop are hidden with river_window_v1.hide.
+	//
+	// Both actions only change the desktop state and ask for a manage
+	// sequence; the visibility pass in window_manager_render_start() is
+	// the single place that turns the state into show/hide requests. If
+	// the focused window ends up on a desktop that is not visible, the
+	// keyboard is handed to a visible window (or cleared).
 	void focus_desktop(struct river_seat_v1 *river_seat, int delta);
-	void move_window_to_desktop(struct river_window_v1 *window, int delta);
+	void move_window_to_desktop(struct river_seat_v1 *river_seat,
+				    struct river_window_v1 *window, int delta);
 
 	// Handle a decoration hint from river. Nothing is sent back, on
 	// purpose: river's default when neither use_csd nor use_ssd is sent
@@ -165,6 +178,11 @@ class View
 		struct river_window_v1 *window;
 		struct river_node_v1 *node;
 		bool managed;
+		// What river believes: true when the last show/hide request
+		// for this window was show(). River considers a new window
+		// shown until told otherwise, so a new entry starts true.
+		// The visibility pass in window_manager_render_start() is
+		// the only writer.
 		bool shown;
 		bool rendered;
 		bool placed;
@@ -208,8 +226,10 @@ class View
 		bool fullscreen_sent;
 		bool always_on_top;
 		bool always_on_top_sent;
+		// Minimizing hides the window through the visibility pass,
+		// like any other visibility change, so there is no
+		// minimized_sent to track.
 		bool minimized;
-		bool minimized_sent;
 
 		// Which virtual desktop this window belongs to. Desktops are a
 		// window manager invention here, not a protocol feature.
@@ -252,11 +272,6 @@ class View
 		// The output a fullscreen window was sent to, or null for "no
 		// preference".
 		struct river_output_v1 *fullscreen_output;
-
-		// The seat whose keyboard focus this window held when it was
-		// minimized, so it can be focused again on restore. May be
-		// null.
-		struct river_seat_v1 *focus_before_minimize;
 	};
 
 	// Manager events.
@@ -346,6 +361,20 @@ class View
 	Window *find_window(struct river_window_v1 *window) const;
 	void add_window(struct river_window_v1 *window);
 	void remove_window(struct river_window_v1 *window);
+
+	// The visibility predicate for the virtual desktops: a window is
+	// visible when it is not minimized and its desktop is the active
+	// one. The render pass is the single place that turns the difference
+	// between this and Window::shown into show/hide requests, and every
+	// focus hand-off filters its target through it as well.
+	static bool window_entry_is_visible(const Window *window_entry,
+					    int active_desktop);
+
+	// Give the keyboard to the first visible window, or clear it when
+	// the active desktop is empty. Called whenever the focused window
+	// stops being visible — a desktop switch, a move to another desktop,
+	// a minimize — so focus never sits on a window the user cannot see.
+	void hand_focus_to_visible_window(struct river_seat_v1 *river_seat);
 	void add_output(struct river_output_v1 *output);
 	void propose_default_dimensions(Window *window) const;
 	void place_windows();

@@ -129,16 +129,9 @@ void View::window_manager_manage_start(void *data,
 			    window_entry->always_on_top;
 		}
 
-		if (window_entry->minimized != window_entry->minimized_sent) {
-			if (window_entry->minimized) {
-				// The protocol's own answer to
-				// minimize_requested: "free to ignore this
-				// request, hide the window, or do whatever
-				// else it chooses".
-				river_window_v1_hide(window_entry->window);
-			}
-			window_entry->minimized_sent = window_entry->minimized;
-		}
+		// A minimize needs no request of its own: it only flips
+		// Window::minimized, and the visibility pass in the render
+		// sequence hides the window (restoring shows it again).
 
 		// A child window (a dialog, file picker, or similar) sits
 		// directly above its parent. place_above is an either-sequence
@@ -199,10 +192,11 @@ void View::window_manager_render_start(void *data,
 	view->pending_render_count = view->window_count;
 
 	// Render-only requests: make sure every window is shown or hidden to
-	// match its desktop and minimized state. show() and hide() are
-	// either-sequence requests, so they would be legal in the manage
-	// sequence too; doing it here keeps every visibility change in one
-	// place, next to the placement that depends on it.
+	// match its desktop and minimized state. River 0.4.8 (v5) documents
+	// show() and hide() as render-sequence requests, while v6 allows
+	// either sequence; sending them here is legal under both. Doing it
+	// in one pass, next to the placement that depends on it, keeps every
+	// visibility change in a single place.
 	for (int i = 0; i < view->window_count; i++) {
 		Window *window_entry = &view->windows[i];
 		if (!window_entry->window) {

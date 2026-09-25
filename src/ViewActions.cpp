@@ -193,6 +193,12 @@ View::window_in_direction(struct river_window_v1 *from,
 		    candidate->height <= 0) {
 			continue;
 		}
+		// Directional focus is a keyboard action, so it must only
+		// land on a window the user can see: a window on another
+		// desktop (or minimized) is not a candidate.
+		if (!window_entry_is_visible(candidate, active_desktop)) {
+			continue;
+		}
 
 		const Rectangle candidate_rectangle{candidate->x, candidate->y,
 						    candidate->width,

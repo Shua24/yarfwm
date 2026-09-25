@@ -206,6 +206,12 @@ void Keybind::perform(int definition_index, struct river_seat_v1 *river_seat)
 	case action_focus_previous: {
 		struct river_window_v1 *target =
 		    seat->previous_focused_window(river_seat);
+		// The previous window may have been left behind on
+		// another desktop (or minimized) since it was focused; a
+		// hidden window must never take the keyboard.
+		if (target && !view->window_is_visible(target)) {
+			target = nullptr;
+		}
 		if (target) {
 			std::fprintf(stderr, "Yarfwm: focus_window_previous\n");
 			seat->focus(river_seat, target);
@@ -358,7 +364,8 @@ void Keybind::perform(int definition_index, struct river_seat_v1 *river_seat)
 		struct river_window_v1 *target =
 		    seat->focused_window(river_seat);
 		if (target) {
-			view->move_window_to_desktop(target, action.amount);
+			view->move_window_to_desktop(river_seat, target,
+						     action.amount);
 		} else {
 			std::fprintf(stderr,
 				     "Yarfwm: move_window_to_desktop: no "

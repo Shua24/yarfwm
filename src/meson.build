@@ -6,6 +6,7 @@ yarfwm_core_sources = files(
   'Server.cpp',
   'Display.cpp',
   'Seat.cpp',
+  'SeatEvents.cpp',
   'SeatPointer.cpp',
   'SeatLayerShell.cpp',
   'View.cpp',

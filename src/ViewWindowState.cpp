@@ -222,9 +222,15 @@ void View::minimize_window(struct river_window_v1 *window)
 	// River's XML on minimize_requested: "The window manager is free to
 	// ignore this request, hide the window, or do whatever else it
 	// chooses." Hiding is the protocol's own answer to minimize, and there
-	// is no inform_minimized request to pair with it.
+	// is no inform_minimized request to pair with it: the visibility pass
+	// hides the window once this flag is set.
 	window_entry->minimized = true;
 	std::fprintf(stderr, "Yarfwm: minimize_window\n");
+	// A minimized window stops being visible, so if it held the keyboard
+	// the focus has to move to a window that is still on screen.
+	if (seat) {
+		hand_focus_to_visible_window(seat->primary_river_seat());
+	}
 	request_state_update(this, true);
 }
 
@@ -240,11 +246,23 @@ void View::restore_minimized_window()
 		}
 		window_entry->minimized = false;
 		std::fprintf(stderr, "Yarfwm: restore_minimized_window\n");
-		// Give the keyboard back if the seat still has nothing
-		// focused; a minimize dropped the focus on the floor.
-		if (seat && window_entry->focus_before_minimize) {
-			seat->focus(window_entry->focus_before_minimize,
-				    window_entry->window);
+		// The window comes back on its own desktop: on the active
+		// one it is visible again and takes the keyboard back, the
+		// way it had it before it was minimized. On any other
+		// desktop it stays hidden, and the seat only needs a fixup
+		// if its focus was left on nothing visible.
+		if (seat) {
+			struct river_seat_v1 *river_seat =
+			    seat->primary_river_seat();
+			if (river_seat) {
+				if (window_is_visible(window_entry->window)) {
+					seat->focus(river_seat,
+						    window_entry->window);
+				} else {
+					hand_focus_to_visible_window(
+					    river_seat);
+				}
+			}
 		}
 		request_manage();
 		return;

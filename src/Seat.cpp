@@ -199,14 +199,22 @@ void Seat::forget_window(struct river_window_v1 *window)
 		}
 
 		// The focused window is gone. Fall back to the most recently
-		// focused survivor, then to any survivor, and only clear the
-		// keyboard focus when no window is left at all.
+		// focused survivor when it is still visible, then to the
+		// first visible window, and clear the keyboard focus only
+		// when nothing is visible: a hidden window must never take
+		// the keyboard.
 		entry->focused_window = nullptr;
 
+		// A hidden window must never take the keyboard: the
+		// previous window may have been left behind on another
+		// desktop (or minimized) since it was focused.
 		struct river_window_v1 *fallback =
 		    entry->previous_focused_window;
+		if (fallback && view && !view->window_is_visible(fallback)) {
+			fallback = nullptr;
+		}
 		if (!fallback && view) {
-			fallback = view->first_window();
+			fallback = view->first_visible_window();
 		}
 
 		if (fallback) {
@@ -245,13 +253,23 @@ void Seat::restore_focus()
 			continue;
 		}
 
+		// The window to put the keyboard back on. It may have been
+		// hidden since it was focused (a desktop switch or a
+		// minimize) or died while the screen was locked: fall back
+		// the way forget_window() does, and only to a visible
+		// window.
 		struct river_window_v1 *target = entry->focused_window;
+		if (target && view && !view->window_is_visible(target)) {
+			target = nullptr;
+		}
 		if (!target && view) {
-			// The focused window died while the screen was
-			// locked: fall back the way forget_window() does.
-			target = entry->previous_focused_window
-				     ? entry->previous_focused_window
-				     : view->first_window();
+			struct river_window_v1 *previous =
+			    entry->previous_focused_window;
+			if (previous && view->window_is_visible(previous)) {
+				target = previous;
+			} else {
+				target = view->first_visible_window();
+			}
 		}
 		if (!target) {
 			continue;
@@ -279,6 +297,17 @@ Seat::previous_focused_window(struct river_seat_v1 *river_seat) const
 {
 	const SeatEntry *entry = find_entry(river_seat);
 	return entry ? entry->previous_focused_window : nullptr;
+}
+
+struct river_window_v1 *
+Seat::focus_intent(struct river_seat_v1 *river_seat) const
+{
+	const SeatEntry *entry = find_entry(river_seat);
+	if (!entry || entry->pending_clear_focus) {
+		return nullptr;
+	}
+	return entry->pending_focus_window ? entry->pending_focus_window
+					   : entry->focused_window;
 }
 
 struct river_seat_v1 *Seat::primary_river_seat() const
@@ -392,82 +421,4 @@ void Seat::terminate()
 	}
 	seat_count = 0;
 	view = nullptr;
-}
-
-void Seat::river_seat_removed(void *data, struct river_seat_v1 *river_seat)
-{
-	Seat *seat = static_cast<Seat *>(data);
-	(void)river_seat;
-	// The object is destroyed during the next manage sequence: river
-	// follows this event with a manage_start of its own.
-	SeatEntry *entry = seat->find_entry(river_seat);
-	if (entry) {
-		entry->removed = true;
-	}
-	std::fprintf(stderr, "Yarfwm: seat removed\n");
-}
-
-void Seat::river_seat_wl_seat(void *data, struct river_seat_v1 *river_seat,
-			      uint32_t name)
-{
-	// River owns the wl_seat plumbing; the window manager only needs the
-	// name to correlate the two objects, which nothing does yet.
-	(void)data;
-	(void)river_seat;
-	(void)name;
-}
-
-void Seat::river_seat_pointer_enter(void *data,
-				    struct river_seat_v1 *river_seat,
-				    struct river_window_v1 *window)
-{
-	Seat *seat = static_cast<Seat *>(data);
-	if (!seat->focus_follows_mouse) {
-		return;
-	}
-	seat->record_focus(seat->find_entry(river_seat), window);
-}
-
-void Seat::river_seat_pointer_leave(void *data,
-				    struct river_seat_v1 *river_seat)
-{
-	(void)data;
-	(void)river_seat;
-}
-
-void Seat::river_seat_window_interaction(void *data,
-					 struct river_seat_v1 *river_seat,
-					 struct river_window_v1 *window)
-{
-	// Clicking a window always focuses it, whether or not focus follows the
-	// pointer.
-	Seat *seat = static_cast<Seat *>(data);
-	seat->record_focus(seat->find_entry(river_seat), window);
-}
-
-void Seat::river_seat_shell_surface_interaction(
-    void *data, struct river_seat_v1 *river_seat,
-    struct river_shell_surface_v1 *shell_surface)
-{
-	// A window manager shell surface (a bar drawn by the window manager)
-	// took the click; there is no window to focus.
-	(void)data;
-	(void)river_seat;
-	(void)shell_surface;
-}
-
-void Seat::river_seat_pointer_position(void *data,
-				       struct river_seat_v1 *river_seat,
-				       int32_t x, int32_t y)
-{
-	// River sends this in every manage sequence (unless the position is
-	// unchanged). The keyboard pointer warp moves relative to the last
-	// reported position, so it is kept per seat.
-	Seat *seat = static_cast<Seat *>(data);
-	SeatEntry *entry = seat->find_entry(river_seat);
-	if (!entry) {
-		return;
-	}
-	entry->pointer_x = x;
-	entry->pointer_y = y;
 }

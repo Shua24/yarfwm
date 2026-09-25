@@ -123,6 +123,14 @@ class Seat
 	struct river_window_v1 *
 	previous_focused_window(struct river_seat_v1 *river_seat) const;
 
+	// The window the seat is on or about to be on: the recorded intent
+	// when one is pending, otherwise the applied focus. A visibility
+	// fixup reads this instead of the applied focus so a click whose
+	// manage sequence has not run yet cannot be overwritten by a stale
+	// applied focus.
+	struct river_window_v1 *
+	focus_intent(struct river_seat_v1 *river_seat) const;
+
 	// The first seat river handed us. Bindings and events that are not tied
 	// to a particular seat act on it.
 	struct river_seat_v1 *primary_river_seat() const;

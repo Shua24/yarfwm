@@ -131,14 +131,65 @@ View::Window *View::find_window(struct river_window_v1 *window) const
 	return nullptr;
 }
 
-struct river_window_v1 *View::first_window() const
+bool View::window_entry_is_visible(const Window *window_entry,
+				   int active_desktop)
+{
+	if (!window_entry->window) {
+		return false;
+	}
+	return !window_entry->minimized &&
+	       window_entry->desktop == active_desktop;
+}
+
+bool View::window_is_visible(struct river_window_v1 *window) const
+{
+	const Window *window_entry = find_window(window);
+	return window_entry != nullptr &&
+	       window_entry_is_visible(window_entry, active_desktop);
+}
+
+struct river_window_v1 *View::first_visible_window() const
 {
 	for (int i = 0; i < window_count; i++) {
-		if (windows[i].window) {
+		if (window_entry_is_visible(&windows[i], active_desktop)) {
 			return windows[i].window;
 		}
 	}
 	return nullptr;
+}
+
+void View::hand_focus_to_visible_window(struct river_seat_v1 *river_seat)
+{
+	if (!seat || !river_seat) {
+		return;
+	}
+
+	// A focused window that is still visible keeps the keyboard: a
+	// desktop switch that did not touch it must not move the focus. The
+	// seat's recorded intent counts as focused here, so a click whose
+	// manage sequence has not run yet cannot be overwritten by a stale
+	// applied focus.
+	struct river_window_v1 *focused = seat->focus_intent(river_seat);
+	if (focused && window_is_visible(focused)) {
+		return;
+	}
+
+	// Prefer the window the user was on before this one when it is
+	// still visible: it is where the focus came from, and where
+	// focus_window_previous would return to.
+	struct river_window_v1 *next =
+	    seat->previous_focused_window(river_seat);
+	if (!next || !window_is_visible(next)) {
+		next = first_visible_window();
+	}
+	if (next) {
+		seat->focus(river_seat, next);
+	} else {
+		// The active desktop is empty: the keyboard has nowhere to
+		// go, and leaving it on a hidden window is the bug this
+		// whole path exists to avoid.
+		seat->focus_none(river_seat);
+	}
 }
 
 void View::add_window(struct river_window_v1 *window)
@@ -163,6 +214,11 @@ void View::add_window(struct river_window_v1 *window)
 	Window *window_entry = &windows[window_count];
 	std::memset(window_entry, 0, sizeof(*window_entry));
 	window_entry->window = window;
+	// A new window joins the desktop the user is looking at, and river
+	// considers a new window shown until told otherwise, so the cached
+	// visibility starts true and the first render pass sends nothing.
+	window_entry->desktop = active_desktop;
+	window_entry->shown = true;
 
 	// Single get_node call: the returned proxy is owned by this window
 	// entry.

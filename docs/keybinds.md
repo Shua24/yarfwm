@@ -93,8 +93,8 @@ bound by the default config; bind them by hand if wanted.
 | `focus_window_previous` | Return focus to the previously focused window. |
 | `move_window_left` / `_right` / `_up` / `_down` | Move the focused window by one 32px step in that direction. |
 | `move_pointer_left` / `_right` / `_up` / `_down` | Move the pointer by one 32px step in that direction (`river_seat_v1.pointer_warp`). River clamps the target into the outputs, so a warp past the screen edge stops at the edge. |
-| `focus_desktop_next` / `_previous` | Switch to the next/previous virtual desktop. |
-| `move_window_to_desktop_next` / `_previous` | Send the focused window to the next/previous virtual desktop. |
+| `focus_desktop_next` / `_previous` | Switch to the next/previous virtual desktop (5 desktops, wrapping). Windows on other desktops are hidden with `river_window_v1.hide` and shown again on return. |
+| `move_window_to_desktop_next` / `_previous` | Send the focused window to the next/previous virtual desktop. It disappears from the current one (or appears, when the wrap lands back on the active desktop). |
 | `toggle_always_on_top` | Keep the focused window above the others (`place_top`/`place_bottom`). |
 | `toggle_maximize` | Toggle the focused window's maximized state. |
 | `fullscreen_window` | Toggle fullscreen for the focused window, on the output it mostly sits on. |
@@ -115,8 +115,10 @@ protocol asks that `exit_session` be sent only when the user explicitly wants
 the session to end, and the single binding does exactly that.
 
 When the focused window disappears, focus falls back to the previously focused
-survivor, then to any surviving window; only when no window is left does the
-seat clear the keyboard focus.
+survivor when it is still visible, then to the first visible window; only when
+nothing is visible does the seat clear the keyboard focus. A hidden window — one
+on another virtual desktop, or minimized — is never a fallback target, and the
+same filter applies to `focus_window_previous` and directional focus.
 
 The fallback is computed **after** the dying window is dropped from the tracked
 window list, so the fallback can never be the dying window itself (focusing a
@@ -131,7 +133,9 @@ When a lock surface takes the keyboard (a lock screen) and then releases it,
 the focus is re-issued to the window the user was on, so the keyboard comes back
 without a click. River drops the focus on unlock without the window manager's
 own record changing, so without that re-issue the seat would sit with no window
-focused.
+focused. The re-issue respects visibility: a window that was hidden (minimized,
+or left on another desktop) while the screen was locked does not get the
+keyboard back.
 
 While a layer surface holds **exclusive** keyboard focus, a recorded focus
 change is left pending rather than discarded — river ignores focus requests
