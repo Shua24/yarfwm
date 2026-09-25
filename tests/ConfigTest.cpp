@@ -87,14 +87,15 @@ TEST_F(ConfigTest, ReadsTheLiveKeys)
 	EXPECT_EQ(config.keybinds.size(), 1U);
 }
 
-TEST_F(ConfigTest, MissingFocusFollowsMouseDefaultsToTrue)
+TEST_F(ConfigTest, MissingFocusFollowsMouseDefaultsToFalse)
 {
-	// The default the Seat reads when the key is absent.
+	// The default the Seat reads when the key is absent: click-to-focus,
+	// the labwc default.
 	const std::string path =
 	    write_file(scratch, "config.json", "{\"keybinds\": []}");
 	Config config;
 	ASSERT_TRUE(config.load(path));
-	EXPECT_TRUE(config.input.get("focus_follows_mouse", true).asBool());
+	EXPECT_FALSE(config.input.get("focus_follows_mouse", false).asBool());
 }
 
 TEST_F(ConfigTest, AbsentKeybindsIsNotAnArray)
@@ -125,7 +126,9 @@ TEST_F(ConfigTest, IgnoresKeysThatLeftTheSchema)
 	ASSERT_TRUE(config.load(path));
 	ASSERT_TRUE(config.keybinds.isArray());
 	EXPECT_EQ(config.keybinds.size(), 1U);
-	EXPECT_TRUE(config.input.get("focus_follows_mouse", true).asBool());
+	// The file supplies true; the fallback literal is the new absent-key
+	// default, so the assertion is about the file value either way.
+	EXPECT_TRUE(config.input.get("focus_follows_mouse", false).asBool());
 }
 
 TEST_F(ConfigTest, ReloadingStaysStable)
@@ -152,8 +155,9 @@ TEST_F(ConfigTest, MissingFileWritesTheEmbeddedDefault)
 	Config written;
 	ASSERT_TRUE(written.load(default_config_path()));
 	ASSERT_TRUE(written.keybinds.isArray());
-	EXPECT_EQ(written.keybinds.size(), 44U);
-	EXPECT_TRUE(written.input.get("focus_follows_mouse", true).asBool());
+	EXPECT_EQ(written.keybinds.size(), 46U);
+	// The embedded default is click-to-focus now, the labwc default.
+	EXPECT_FALSE(written.input.get("focus_follows_mouse", false).asBool());
 }
 
 TEST_F(ConfigTest, MalformedFileFallsBackToTheDefault)
@@ -163,7 +167,7 @@ TEST_F(ConfigTest, MalformedFileFallsBackToTheDefault)
 	Config config;
 	ASSERT_TRUE(config.load(path));
 	ASSERT_TRUE(config.keybinds.isArray());
-	EXPECT_EQ(config.keybinds.size(), 44U);
+	EXPECT_EQ(config.keybinds.size(), 46U);
 }
 
 } // namespace

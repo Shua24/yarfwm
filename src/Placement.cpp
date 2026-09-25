@@ -111,3 +111,64 @@ void apply_dimension_hints(int32_t min_width, int32_t min_height,
 		geometry.height = max_height;
 	}
 }
+
+// The root of a window hierarchy, found by walking parent links. labwc does
+// this through view_get_root() (view.c:257-264) and then minimizes the root
+// before its sub-views, so that a dialog's toplevel is minimized along with it
+// and vice versa.
+//
+// A cycle would be a protocol violation ("The compositor must guarantee that
+// there are no loops in the window tree"), but this runs inside the event loop
+// on state river supplied, so it must not be able to hang: the walk is capped
+// at the entry count and gives up on the entry it would revisit.
+int minimize_root_index(const int *parent_index, int count, int index)
+{
+	if (!parent_index || index < 0 || index >= count) {
+		return -1;
+	}
+
+	int root = index;
+	for (int step = 0; step < count; step++) {
+		const int parent = parent_index[root];
+		if (parent < 0 || parent >= count || parent == root) {
+			break;
+		}
+		root = parent;
+	}
+	return root;
+}
+
+// The root of the most recently minimized hierarchy.
+//
+// "Most recently minimized" is tracked with a counter rather than inferred
+// from array position. Array order is not minimize order: remove_window()
+// swaps the last entry into the freed slot, and a hierarchy minimized later
+// can sit at a lower index than one minimized earlier, so an index scan would
+// restore the wrong window.
+int most_recently_minimized_root(const int *parent_index, const bool *minimized,
+				 const uint64_t *minimize_sequence, int count)
+{
+	int best = -1;
+	uint64_t best_sequence = 0;
+
+	for (int index = 0; index < count; index++) {
+		if (!minimized[index]) {
+			continue;
+		}
+		const uint64_t sequence = minimize_sequence[index];
+		if (sequence == 0) {
+			// Not minimized through the action (no sequence was
+			// handed out); it cannot be the most recent one.
+			continue;
+		}
+		if (best < 0 || sequence > best_sequence) {
+			best = index;
+			best_sequence = sequence;
+		}
+	}
+
+	if (best < 0) {
+		return -1;
+	}
+	return minimize_root_index(parent_index, count, best);
+}

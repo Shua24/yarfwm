@@ -177,11 +177,11 @@ void View::window_parent(void *data, struct river_window_v1 *window,
 	window_entry->parent = parent;
 
 	// XML: "Child windows should generally be rendered directly above
-	// their parent." place_above is an either-sequence request; a manage
-	// sequence is asked for because that is the only sequence the window
-	// manager can request from river, and the parent may not be managed
-	// yet (river can report a parent before the parent window itself), so
-	// it is applied when the manage sequence runs.
+	// their parent." The place_above goes out in the render sequence
+	// (render-only in v5), so a manage sequence is asked for here — it
+	// is always followed by at least one render sequence — and the
+	// request is applied once the parent is known and managed (river
+	// can report a parent before the parent window itself).
 	if (parent) {
 		view->request_manage();
 	}

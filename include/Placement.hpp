@@ -48,4 +48,28 @@ void apply_dimension_hints(int32_t min_width, int32_t min_height,
 			   int32_t max_width, int32_t max_height,
 			   Rectangle &geometry);
 
+// Follow parent links up to the root of a window's hierarchy and return its
+// index. parent_index holds, for each entry, the index of its parent entry, or
+// -1 when the entry has no parent. A window with no parent is its own root.
+//
+// The protocol guarantees "there are no loops in the window tree", but a bug
+// upstream could still hand us one, so the walk is bounded by the entry count
+// and returns the entry it would revisit rather than spinning.
+//
+// labwc minimizes a whole view hierarchy from any member of it (view.c:800-802
+// minimizes the root, then every sub-view), which is why the root has to be
+// findable from any member.
+int minimize_root_index(const int *parent_index, int count, int index);
+
+// The index of the root of the most recently minimized hierarchy, or -1 when
+// nothing is minimized.
+//
+// Selection is by minimize_sequence, never by array position: yarfwm's restore
+// action means "bring back the last thing I hid", and array order is not
+// minimize order. View::remove_window() swaps the last entry into a freed slot,
+// so array order changes under the user's feet, and a window minimized later
+// can easily sit at a lower index than one minimized earlier.
+int most_recently_minimized_root(const int *parent_index, const bool *minimized,
+				 const uint64_t *minimize_sequence, int count);
+
 #endif // PLACEMENT_HPP

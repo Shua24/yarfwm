@@ -5,7 +5,7 @@
 
 #include <cstdio>
 
-// The window state and geometry actions, and the virtual desktops.
+// The window state and geometry actions.
 //
 // Every action here is reachable from two places: a key binding in
 // KeybindActions.cpp, and the matching river event in ViewEvents.cpp (a
@@ -13,11 +13,13 @@
 // minimize_requested and friends). Both paths call these functions so the two
 // cannot drift apart.
 //
+// Minimize and restore live in src/ViewMinimize.cpp: they work on a window
+// hierarchy, which needs the parent walk, and this file is at its size budget.
+//
 // Sequence rules, from river-window-management-v1.xml:
 //   manage only   inform_maximized, inform_unmaximized, fullscreen,
 //                 exit_fullscreen
-//   either        hide, show, place_top, place_bottom
-//   render only   set_position (through place_windows())
+//   render only   hide, show, place_top, place_bottom, set_position
 //
 // So a state change is recorded on the Window and sent by
 // View::window_manager_manage_start(); the position half is applied by
@@ -100,6 +102,20 @@ void View::toggle_maximize(struct river_window_v1 *window)
 		     window_entry->maximized ? "maximized" : "restored");
 
 	if (window_entry->maximized) {
+		// Save the floating geometry so un-maximize restores it
+		// exactly, the way labwc restores natural_geometry. It is
+		// the user's geometry when there is one, otherwise where
+		// the cascade put the window.
+		Rectangle floating =
+		    window_entry->has_user_geometry
+			? window_entry->user_geometry
+			: Rectangle{window_entry->x, window_entry->y,
+				    window_entry->width, window_entry->height};
+		if (floating.width > 0 && floating.height > 0) {
+			window_entry->saved_geometry = floating;
+			window_entry->has_saved_geometry = true;
+		}
+
 		// A maximized window fills the placement area, which is the
 		// output minus the exclusive zones of bars and docks. River
 		// keeps the window manager responsible for the geometry of a
@@ -109,9 +125,16 @@ void View::toggle_maximize(struct river_window_v1 *window)
 		placement_area(&area.x, &area.y, &area.width, &area.height);
 		set_user_geometry(window, area);
 		propose_user_dimensions(window, area);
+	} else if (window_entry->has_saved_geometry) {
+		// Un-maximize restores the exact pre-maximize geometry.
+		Rectangle restored = window_entry->saved_geometry;
+		window_entry->has_saved_geometry = false;
+		set_user_geometry(window, restored);
+		propose_user_dimensions(window, restored);
 	} else {
-		// Restore the floating default: half the placement area,
-		// centred. The window keeps where it was put.
+		// No saved geometry (a maximize that never saw a placed
+		// window): fall back to half the placement area. The window
+		// keeps where it was put.
 		Rectangle area{0, 0, 0, 0};
 		placement_area(&area.x, &area.y, &area.width, &area.height);
 		Rectangle restored =
@@ -210,65 +233,6 @@ void View::toggle_always_on_top(struct river_window_v1 *window)
 	std::fprintf(stderr, "Yarfwm: toggle_always_on_top -> %s\n",
 		     window_entry->always_on_top ? "on top" : "normal");
 	request_state_update(this, true);
-}
-
-void View::minimize_window(struct river_window_v1 *window)
-{
-	Window *window_entry = find_window(window);
-	if (!window_entry || window_entry->minimized) {
-		return;
-	}
-
-	// River's XML on minimize_requested: "The window manager is free to
-	// ignore this request, hide the window, or do whatever else it
-	// chooses." Hiding is the protocol's own answer to minimize, and there
-	// is no inform_minimized request to pair with it: the visibility pass
-	// hides the window once this flag is set.
-	window_entry->minimized = true;
-	std::fprintf(stderr, "Yarfwm: minimize_window\n");
-	// A minimized window stops being visible, so if it held the keyboard
-	// the focus has to move to a window that is still on screen.
-	if (seat) {
-		hand_focus_to_visible_window(seat->primary_river_seat());
-	}
-	request_state_update(this, true);
-}
-
-void View::restore_minimized_window()
-{
-	// The most recently minimized window comes back, which is what the
-	// taskbar or a "restore" binding means. Every window hidden for a
-	// desktop other than the active one stays hidden.
-	for (int i = window_count - 1; i >= 0; i--) {
-		Window *window_entry = &windows[i];
-		if (!window_entry->window || !window_entry->minimized) {
-			continue;
-		}
-		window_entry->minimized = false;
-		std::fprintf(stderr, "Yarfwm: restore_minimized_window\n");
-		// The window comes back on its own desktop: on the active
-		// one it is visible again and takes the keyboard back, the
-		// way it had it before it was minimized. On any other
-		// desktop it stays hidden, and the seat only needs a fixup
-		// if its focus was left on nothing visible.
-		if (seat) {
-			struct river_seat_v1 *river_seat =
-			    seat->primary_river_seat();
-			if (river_seat) {
-				if (window_is_visible(window_entry->window)) {
-					seat->focus(river_seat,
-						    window_entry->window);
-				} else {
-					hand_focus_to_visible_window(
-					    river_seat);
-				}
-			}
-		}
-		request_manage();
-		return;
-	}
-
-	std::fprintf(stderr, "Yarfwm: restore_minimized_window: none\n");
 }
 
 void View::center_window(struct river_window_v1 *window)

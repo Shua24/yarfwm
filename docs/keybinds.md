@@ -36,8 +36,8 @@ Bindings are registered per seat (river scopes a binding to a seat) and only
 A run with the default config logs, at startup:
 
 ```
-Yarfwm: 44 key bindings parsed
-Yarfwm: registered 44/44 key bindings on a seat
+Yarfwm: 46 key bindings parsed
+Yarfwm: registered 46/46 key bindings on a seat
 ```
 
 Every entry in the default config names an implemented action, so nothing is
@@ -81,8 +81,10 @@ Pressing any other key while a repeat is running stops it (river sends
 ### Implemented
 
 Every action below is implemented and registers when the default config names
-it. `minimize_window` and `restore_minimized_window` are implemented but not
-bound by the default config; bind them by hand if wanted.
+it. `minimize_window` and `restore_minimized_window` are bound by default
+(`Super+M` / `Super+Shift+M`). They are also the only way back to a minimized
+window: a taskbar entry cannot restore one (river drops the panel's click — see
+`docs/features/panel-taskbar.md`).
 
 | Action | Effect |
 |---|---|
@@ -96,15 +98,15 @@ bound by the default config; bind them by hand if wanted.
 | `focus_desktop_next` / `_previous` | Switch to the next/previous virtual desktop (5 desktops, wrapping). Windows on other desktops are hidden with `river_window_v1.hide` and shown again on return. |
 | `move_window_to_desktop_next` / `_previous` | Send the focused window to the next/previous virtual desktop. It disappears from the current one (or appears, when the wrap lands back on the active desktop). |
 | `toggle_always_on_top` | Keep the focused window above the others (`place_top`/`place_bottom`). |
-| `toggle_maximize` | Toggle the focused window's maximized state. |
+| `toggle_maximize` | Toggle the focused window's maximized state. Un-maximize restores the exact pre-maximize geometry. |
 | `fullscreen_window` | Toggle fullscreen for the focused window, on the output it mostly sits on. |
 | `fit_to_output` | Resize the focused window to the placement area (the output minus bars/docks). |
 | `center_window` | Centre the focused window in the placement area. |
 | `center_all_windows` | Centre every window in the placement area. |
 | `set_window_width` | Grow/shrink the focused window's width by the percentage in `args` (`"-10%"`, `"+10%"`). |
 | `set_window_height` | Same for height. |
-| `minimize_window` | Hide the focused window (the protocol's own answer to minimize). Not bound by default. |
-| `restore_minimized_window` | Show the most recently minimized window again. Not bound by default. |
+| `minimize_window` | Minimize the focused window's whole hierarchy (the window and any dialogs it owns), the way labwc's Iconify does; focus goes to the topmost visible window. Bound to `Super+M`. |
+| `restore_minimized_window` | Bring back the **most recently minimized** hierarchy, raising it to the front and focusing it. If it was minimized on another virtual desktop, that desktop is brought forward so the window is actually visible. Bound to `Super+Shift+M`. |
 
 `exit_session` is the only action that ends the session, and it is bound to
 `Super+Shift+E` by default. Yarfwm has no action that stops the window manager
@@ -114,8 +116,8 @@ manager — under a display manager, with no way out but a VT switch. River's
 protocol asks that `exit_session` be sent only when the user explicitly wants
 the session to end, and the single binding does exactly that.
 
-When the focused window disappears, focus falls back to the previously focused
-survivor when it is still visible, then to the first visible window; only when
+When the focused window disappears, focus falls back to the **topmost visible
+window** — the one the user most recently brought to the front; only when
 nothing is visible does the seat clear the keyboard focus. A hidden window — one
 on another virtual desktop, or minimized — is never a fallback target, and the
 same filter applies to `focus_window_previous` and directional focus.
@@ -130,12 +132,13 @@ or logs `focus_window_previous: no previous window` — it never silently does
 nothing. A closed previous window is dropped rather than remembered.
 
 When a lock surface takes the keyboard (a lock screen) and then releases it,
-the focus is re-issued to the window the user was on, so the keyboard comes back
-without a click. River drops the focus on unlock without the window manager's
-own record changing, so without that re-issue the seat would sit with no window
-focused. The re-issue respects visibility: a window that was hidden (minimized,
-or left on another desktop) while the screen was locked does not get the
-keyboard back.
+the focus is re-issued so the keyboard comes back without a click. River drops
+the focus on unlock without the window manager's own record changing, so
+without that re-issue the seat would sit with no window focused. The re-issue
+respects visibility: the window the user was on gets the keyboard back when it
+is still visible; otherwise the keyboard goes to the topmost visible window. A
+window that was hidden (minimized, or left on another desktop) while the screen
+was locked never gets the keyboard back.
 
 While a layer surface holds **exclusive** keyboard focus, a recorded focus
 change is left pending rather than discarded — river ignores focus requests
@@ -143,10 +146,12 @@ until the surface lets go, and the first manage sequence after it does applies
 the pending change. This matters when the focused window dies in the meantime:
 the fallback survives the lock and the keyboard comes back to a real window.
 
-Pointer events: with `input.focus_follows_mouse` true (the default) moving the
-pointer into a window focuses it; clicking a window focuses it regardless of
-that setting. The `move_pointer_*` actions move the pointer itself, which can
-focus a window under it through that same path.
+Pointer events: **click-to-focus is the default** (`input.focus_follows_mouse`
+is `false`, matching labwc). Clicking a window focuses it and raises it to the
+front of the stacking order. With `input.focus_follows_mouse` set to `true`,
+moving the pointer into a window focuses it as well. The `move_pointer_*`
+actions move the pointer itself, which can focus a window under it through that
+same path.
 
 A close request is a request, not a command: a window may refuse it (terminal
 emulators ask for confirmation when a process is still running). Pressing the
@@ -203,6 +208,7 @@ leaves the key free for the client instead of consuming it.
 | `show_hotkey_overlay` | `Super+Slash` | the overlay needs a window-manager-owned renderer; yarfwm has none |
 | `quit` | `Super+E` | stopped the window manager and left river running with no window manager; `exit_session` is the only way to end a session from inside the window manager |
 
-Net effect: 47 inherited binds became 44 — 15 renames in place, 8 deleted, 5
-added (`Super+Shift+E` for `exit_session` when that action landed, and the four
-`move_pointer_*` binds when the keyboard pointer warp landed).
+Net effect: 47 inherited binds became 46 — 15 renames in place, 8 deleted, 7
+added (`Super+Shift+E` for `exit_session` when that action landed, the four
+`move_pointer_*` binds when the keyboard pointer warp landed, and `Super+M` /
+`Super+Shift+M` for minimize and restore when labwc-parity minimize landed).

@@ -1,4 +1,5 @@
 #include "Seat.hpp"
+#include "View.hpp"
 #include "river-layer-shell-v1-client-protocol.h"
 #include "river-window-management-v1-client-protocol.h"
 
@@ -55,10 +56,16 @@ void Seat::river_seat_window_interaction(void *data,
 					 struct river_seat_v1 *river_seat,
 					 struct river_window_v1 *window)
 {
-	// Clicking a window always focuses it, whether or not focus follows the
-	// pointer.
+	// Clicking a window focuses it and raises it, whether or not focus
+	// follows the pointer. The XML's own rationale for this event names
+	// raising: it gives window managers "necessary information to
+	// determine when to send keyboard focus, raise a window that already
+	// has keyboard focus, etc."
 	Seat *seat = static_cast<Seat *>(data);
 	seat->record_focus(seat->find_entry(river_seat), window);
+	if (seat->view) {
+		seat->view->raise_window(window);
+	}
 }
 
 void Seat::river_seat_shell_surface_interaction(

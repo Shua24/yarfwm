@@ -1,6 +1,6 @@
 {
   "input": {
-    "focus_follows_mouse": true
+    "focus_follows_mouse": false
   },
   "keybinds": [
     { "modifiers": ["Super"], "key": "Return", "action": "spawn", "args": ["kitty"] },
@@ -40,6 +40,8 @@
     { "modifiers": ["Super"], "key": "F", "action": "toggle_maximize" },
     { "modifiers": ["Super", "Shift"], "key": "F", "action": "fullscreen_window" },
     { "modifiers": ["Super", "Ctrl"], "key": "F", "action": "fit_to_output" },
+    { "modifiers": ["Super"], "key": "M", "action": "minimize_window", "repeat": false },
+    { "modifiers": ["Super", "Shift"], "key": "M", "action": "restore_minimized_window", "repeat": false },
     { "modifiers": ["Super"], "key": "C", "action": "center_window" },
     { "modifiers": ["Super", "Ctrl"], "key": "C", "action": "center_all_windows" },
     { "modifiers": ["Super"], "key": "Minus", "action": "set_window_width", "args": ["-10%"] },

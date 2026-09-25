@@ -88,11 +88,20 @@ class View
 	bool window_geometry(struct river_window_v1 *window,
 			     Rectangle *geometry) const;
 
-	// The window to hand the keyboard to when the focused window is
-	// destroyed or stops being visible and the seat has no previous
-	// window left to return to. Only windows on the active desktop are
-	// candidates: a hidden window must never take the keyboard.
-	struct river_window_v1 *first_visible_window() const;
+	// Raise a window to the front of the stacking order. place_top is
+	// render-sequence-only in v5, so the request is recorded and sent by
+	// the next render sequence; the stacking record advances immediately
+	// so a focus fallback that runs before that sequence already sees
+	// the new order.
+	void raise_window(struct river_window_v1 *window);
+
+	// The topmost visible window: the highest stacking order among the
+	// windows on the active desktop. This is the focus fallback for a
+	// close, a minimize, a desktop switch and a lock restore — the
+	// choice labwc's desktop_focus_topmost_view() makes. Only windows on
+	// the active desktop are candidates: a hidden window must never take
+	// the keyboard.
+	struct river_window_v1 *topmost_visible_window() const;
 
 	// Whether a window is on screen right now: it is not minimized and
 	// its desktop is the active one. Every focus hand-off filters its
@@ -119,6 +128,17 @@ class View
 	// decide; it comes through here.
 	void toggle_fullscreen(struct river_window_v1 *window);
 	void toggle_always_on_top(struct river_window_v1 *window);
+
+	// Minimize and restore: labwc's Iconify semantics (src/view.c:784-816).
+	//
+	// Minimize works on the whole hierarchy — a dialog and its toplevel go
+	// together, whichever asked — and hands the keyboard to the topmost
+	// visible window, labwc's desktop_focus_topmost_view().
+	//
+	// Restore brings back the most recently minimized hierarchy (by
+	// minimize order, not array position), brings its desktop forward and
+	// hands it the keyboard. It is the only way back: river drops a panel's
+	// activate request (panel-taskbar.md).
 	void minimize_window(struct river_window_v1 *window);
 	void restore_minimized_window();
 
@@ -127,7 +147,6 @@ class View
 	void center_window(struct river_window_v1 *window);
 	void center_all_windows();
 	void fit_to_output(struct river_window_v1 *window);
-
 	// Grow or shrink a window by a percentage of its current size. A
 	// negative delta shrinks. The size is a proposal: the window may keep
 	// its own minimum.
@@ -147,6 +166,12 @@ class View
 	void focus_desktop(struct river_seat_v1 *river_seat, int delta);
 	void move_window_to_desktop(struct river_seat_v1 *river_seat,
 				    struct river_window_v1 *window, int delta);
+
+	// Bring the active desktop to a window's desktop, so the window becomes
+	// visible. labwc switches workspace to make a view visible before
+	// focusing it (src/desktop.c:142-148); restore needs the same, or a
+	// window minimized on another desktop would restore invisibly.
+	void switch_to_window_desktop(struct river_window_v1 *window);
 
 	// Handle a decoration hint from river. Nothing is sent back, on
 	// purpose: river's default when neither use_csd nor use_ssd is sent
@@ -207,6 +232,13 @@ class View
 		bool has_user_geometry;
 		Rectangle user_geometry;
 
+		// The geometry a window had before it was maximized, saved
+		// when maximize turns on so un-maximize can restore it
+		// exactly, the way labwc restores natural_geometry.
+		// has_saved_geometry is false outside a maximize cycle.
+		Rectangle saved_geometry;
+		bool has_saved_geometry;
+
 		// A resize the user asked for, waiting for the next manage
 		// sequence: river_window_v1.propose_dimensions is
 		// manage-sequence-only and a node has no dimension setter, so
@@ -226,10 +258,28 @@ class View
 		bool fullscreen_sent;
 		bool always_on_top;
 		bool always_on_top_sent;
-		// Minimizing hides the window through the visibility pass,
-		// like any other visibility change, so there is no
-		// minimized_sent to track.
+		// Minimizing hides the window through the visibility pass, like
+		// any other visibility change, so there is no minimized_sent.
+		//
+		// minimize_sequence records when this entry was minimized, so
+		// "restore the most recent one" means the most recent minimize
+		// and not the highest array index. 0 = not minimized by the
+		// action.
 		bool minimized;
+		uint64_t minimize_sequence;
+
+		// A raise is pending: the render pass turns this into one
+		// place_top and clears it. Clicking a window, unminimizing
+		// it, and mapping it all raise it, and place_top is
+		// render-sequence-only in v5, so the request waits for the
+		// next render sequence.
+		bool raise_pending;
+
+		// Stacking order as yarfwm tracks it: the highest z_order
+		// among the visible windows is the topmost one. River has no
+		// stacking query, so this is the window manager's own record,
+		// advanced every time a window is raised or mapped.
+		uint64_t z_order;
 
 		// Which virtual desktop this window belongs to. Desktops are a
 		// window manager invention here, not a protocol feature.
@@ -370,10 +420,27 @@ class View
 	static bool window_entry_is_visible(const Window *window_entry,
 					    int active_desktop);
 
-	// Give the keyboard to the first visible window, or clear it when
-	// the active desktop is empty. Called whenever the focused window
-	// stops being visible — a desktop switch, a move to another desktop,
-	// a minimize — so focus never sits on a window the user cannot see.
+	// Fill parent_index with, for each tracked entry, the index of its
+	// parent entry or -1 when it has none. This is the tree shape the pure
+	// helpers in src/Placement.cpp walk, which is how the walking logic
+	// stays unit testable without a Wayland connection. Returns false when
+	// the array is unusable.
+	bool build_parent_index(int *parent_index) const;
+
+	// How many tracked windows a hierarchy holds, for the log line.
+	int hierarchy_size(const int *parent_index, int root_index) const;
+
+	// Set or clear the minimized flag across a whole hierarchy, from the
+	// root down. Every member carries the same minimize_sequence so a later
+	// restore can find the hierarchy again from any of its members.
+	void set_hierarchy_minimized(const int *parent_index, int root_index,
+				     bool minimized,
+				     uint64_t minimize_sequence);
+	// Give the keyboard to the topmost visible window, or clear it
+	// when the active desktop is empty. Called whenever the focused
+	// window stops being visible — a desktop switch, a move to another
+	// desktop, a minimize — so focus never sits on a window the user
+	// cannot see.
 	void hand_focus_to_visible_window(struct river_seat_v1 *river_seat);
 	void add_output(struct river_output_v1 *output);
 	void propose_default_dimensions(Window *window) const;
@@ -412,6 +479,17 @@ class View
 	// The virtual desktop shown right now. Windows whose desktop differs
 	// are hidden with river_window_v1.hide.
 	int active_desktop;
+
+	// The stacking-order clock: every raise hands out the next value, so
+	// the highest z_order among the visible windows is the topmost one.
+	// It starts at 1 so a zero-initialized entry is never topmost.
+	uint64_t next_z_order;
+
+	// The minimize-order clock, the same shape as next_z_order: every
+	// minimize hands out the next value, so the highest minimize_sequence
+	// among the minimized hierarchies is the most recently minimized one.
+	// It starts at 1 so a zero-initialized entry is never "most recent".
+	uint64_t next_minimize_sequence;
 
 	// How many virtual desktops exist. River has no desktop concept, so
 	// this is yarfwm's own fixed count.

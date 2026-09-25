@@ -118,34 +118,9 @@ void View::window_manager_manage_start(void *data,
 			    window_entry->fullscreen;
 		}
 
-		if (window_entry->always_on_top !=
-		    window_entry->always_on_top_sent) {
-			if (window_entry->always_on_top) {
-				river_node_v1_place_top(window_entry->node);
-			} else {
-				river_node_v1_place_bottom(window_entry->node);
-			}
-			window_entry->always_on_top_sent =
-			    window_entry->always_on_top;
-		}
-
 		// A minimize needs no request of its own: it only flips
 		// Window::minimized, and the visibility pass in the render
 		// sequence hides the window (restoring shows it again).
-
-		// A child window (a dialog, file picker, or similar) sits
-		// directly above its parent. place_above is an either-sequence
-		// request, and this is the sequence the manager can ask for, so
-		// it goes here once the parent is actually known and managed.
-		if (window_entry->parent && !window_entry->parent_placed) {
-			Window *parent_entry =
-			    view->find_window(window_entry->parent);
-			if (parent_entry && parent_entry->node) {
-				river_node_v1_place_above(window_entry->node,
-							  parent_entry->node);
-				window_entry->parent_placed = true;
-			}
-		}
 	}
 
 	// Close requests are manage-sequence-only; send one per window, once.
@@ -218,6 +193,55 @@ void View::window_manager_render_start(void *data,
 			river_window_v1_hide(window_entry->window);
 		}
 		window_entry->shown = visible;
+	}
+
+	// Stacking requests. place_top/place_bottom/place_above are
+	// render-sequence-only in v5, so every one of them goes out here:
+	// a pending raise (a click, a fresh window, an un-minimize), the
+	// always-on-top state when it changed, and a child window's
+	// place_above its parent once the parent is known.
+	for (int i = 0; i < view->window_count; i++) {
+		Window *window_entry = &view->windows[i];
+		if (!window_entry->window || !window_entry->node) {
+			continue;
+		}
+
+		if (window_entry->raise_pending) {
+			river_node_v1_place_top(window_entry->node);
+			window_entry->raise_pending = false;
+		}
+
+		if (window_entry->always_on_top !=
+		    window_entry->always_on_top_sent) {
+			if (window_entry->always_on_top) {
+				river_node_v1_place_top(window_entry->node);
+				// The render list now has this window on
+				// top; keep the stacking record in step or a
+				// later raise would be skipped as redundant.
+				window_entry->z_order = view->next_z_order++;
+			} else {
+				river_node_v1_place_bottom(window_entry->node);
+				// ... and on the bottom now, so a focus
+				// fallback does not pick it believing it is
+				// still the topmost window.
+				window_entry->z_order = 0;
+			}
+			window_entry->always_on_top_sent =
+			    window_entry->always_on_top;
+		}
+
+		// A child window (a dialog, file picker, or similar) sits
+		// directly above its parent, applied once as soon as the
+		// parent is known and managed.
+		if (window_entry->parent && !window_entry->parent_placed) {
+			Window *parent_entry =
+			    view->find_window(window_entry->parent);
+			if (parent_entry && parent_entry->node) {
+				river_node_v1_place_above(window_entry->node,
+							  parent_entry->node);
+				window_entry->parent_placed = true;
+			}
+		}
 	}
 
 	view->place_windows();

@@ -220,3 +220,41 @@ View::window_in_direction(struct river_window_v1 *from,
 
 	return best;
 }
+
+void View::raise_window(struct river_window_v1 *window)
+{
+	Window *window_entry = find_window(window);
+	if (!window_entry) {
+		return;
+	}
+	if (window_entry->z_order == next_z_order - 1) {
+		// Already the front-most window: a repeat click on the
+		// focused window must not churn the stacking order.
+		return;
+	}
+	window_entry->z_order = next_z_order++;
+	window_entry->raise_pending = true;
+	// place_top is render-sequence-only in v5, so ask for the sequence
+	// that sends it.
+	request_manage();
+}
+
+struct river_window_v1 *View::topmost_visible_window() const
+{
+	struct river_window_v1 *topmost = nullptr;
+	uint64_t best_z_order = 0;
+	for (int i = 0; i < window_count; i++) {
+		const Window *window_entry = &windows[i];
+		if (!window_entry_is_visible(window_entry, active_desktop)) {
+			continue;
+		}
+		// The comparison is >= so a tie (possible only if the
+		// clock was reset) keeps the later entry, matching the
+		// "most recently raised" reading of the order.
+		if (!topmost || window_entry->z_order >= best_z_order) {
+			topmost = window_entry->window;
+			best_z_order = window_entry->z_order;
+		}
+	}
+	return topmost;
+}

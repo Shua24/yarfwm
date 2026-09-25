@@ -14,6 +14,7 @@ yarfwm_core_sources = files(
   'ViewActions.cpp',
   'ViewSequences.cpp',
   'ViewWindowState.cpp',
+  'ViewMinimize.cpp',
   'ViewDesktops.cpp',
   'Placement.cpp',
   'Config.cpp',

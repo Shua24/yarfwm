@@ -21,10 +21,10 @@ Two rules drove the pass:
 
 ## The state it produced
 
-- **Actions:** 28 distinct action names in the default config, all implemented,
-  all registered; 44 binds parsed and 44 registered, nothing skipped. The
-  startup line reports it: `Yarfwm: 44 key bindings parsed`,
-  `Yarfwm: registered 44/44 key bindings on a seat`.
+- **Actions:** 30 distinct action names in the default config, all implemented,
+  all registered; 46 binds parsed and 46 registered, nothing skipped. The
+  startup line reports it: `Yarfwm: 46 key bindings parsed`,
+  `Yarfwm: registered 46/46 key bindings on a seat`.
 - **Stubs:** 23 empty handler bodies at the start → **8** now, and each
   remaining one is inert by design (a listener slot that must stay non-NULL, or
   an event with no policy attached). The `pointer_position` handler — the one
@@ -38,7 +38,7 @@ Two rules drove the pass:
   features (compositor-drawn borders via `set_borders`); some have no consumer
   under yarfwm's policy.
 - **The config-constraint schema.** The config is now exactly
-  `{ "input": { "focus_follows_mouse": true }, "keybinds": [ ...44... ] }` —
+  `{ "input": { "focus_follows_mouse": false }, "keybinds": [ ...46... ] }` —
   two keys, both consumed. Everything else the inherited config carried
   (`layout`, `outputs`, `workspaces`, `spawn_at_startup`, `window_rules`,
   `prefer_no_csd`, `screenshot_path`, the inert input sub-blocks) was read by
@@ -66,9 +66,12 @@ hint to be re-sent whenever the window changes its preferences.
   app_id/title immediately, so a half-filled listener kills the WM on the first
   window. Every slot is populated, even with a no-op.
 - **Sequence rules are per-request and versioned.** v5 is what river 0.4.8
-  enforces: `show`/`set_position`/`place_*`/`set_borders` are render-only there,
-  while `propose_dimensions`, focus, and the state requests are manage-only.
-  The code binds `min(advertised, 6)` and obeys v5 until river speaks v6.
+  enforces: `show`/`hide`/`set_position`/`place_*`/`set_borders` are render-only
+  there, while `propose_dimensions`, focus, and the state requests are
+  manage-only. The code follows this rule for `place_*` since the stacking
+  batch: the stacking requests moved from the manage sequence into the render
+  sequence. The code binds `min(advertised, 6)` and obeys v5 until river speaks
+  v6.
 
 ## Bugs fixed during the pass
 

@@ -56,7 +56,8 @@ static void announce_desktop_switch(int desktop_index, int desktop_total,
 {
 	char summary[64];
 	std::snprintf(summary, sizeof(summary),
-		      window_moved ? "Window -> desktop %d/%d" : "Desktop %d/%d",
+		      window_moved ? "Window -> desktop %d/%d"
+				   : "Desktop %d/%d",
 		      desktop_index + 1, desktop_total);
 
 	pid_t process_id = fork();
@@ -111,6 +112,29 @@ void View::focus_desktop(struct river_seat_v1 *river_seat, int delta)
 	// hand the keyboard to something that is.
 	hand_focus_to_visible_window(river_seat);
 	request_manage();
+}
+
+void View::switch_to_window_desktop(struct river_window_v1 *window)
+{
+	Window *window_entry = find_window(window);
+	if (!window_entry || window_entry->desktop == active_desktop) {
+		return;
+	}
+
+	// labwc's desktop_focus_view_internal() switches workspace to make the
+	// view visible before focusing it ("Switch workspace if necessary to
+	// make the view visible", src/desktop.c:142-148), so focusing a view on
+	// another workspace brings that workspace forward. Restore does the
+	// same here: without it, restoring a window that was minimized on
+	// another desktop would succeed in the model and show the user
+	// nothing, which is exactly the "restore did not work" symptom.
+	active_desktop = window_entry->desktop;
+	std::fprintf(stderr, "Yarfwm: switch_to_window_desktop -> %d\n",
+		     active_desktop);
+	// Announced like any other switch: the user did not press the desktop
+	// key, so without the bubble the screen would change with no
+	// explanation.
+	announce_desktop_switch(active_desktop, View::desktop_total(), false);
 }
 
 void View::move_window_to_desktop(struct river_seat_v1 *river_seat,

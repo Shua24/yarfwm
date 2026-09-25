@@ -34,7 +34,7 @@ View::View()
       output_capacity(0), default_layer_output(nullptr),
       pending_manage_count(0), pending_render_count(0),
       shutdown_requested(false), manage_requested(false), keybind(nullptr),
-      session_locked(false), active_desktop(0)
+      session_locked(false), active_desktop(0), next_z_order(1)
 {
 }
 
@@ -148,16 +148,6 @@ bool View::window_is_visible(struct river_window_v1 *window) const
 	       window_entry_is_visible(window_entry, active_desktop);
 }
 
-struct river_window_v1 *View::first_visible_window() const
-{
-	for (int i = 0; i < window_count; i++) {
-		if (window_entry_is_visible(&windows[i], active_desktop)) {
-			return windows[i].window;
-		}
-	}
-	return nullptr;
-}
-
 void View::hand_focus_to_visible_window(struct river_seat_v1 *river_seat)
 {
 	if (!seat || !river_seat) {
@@ -174,14 +164,10 @@ void View::hand_focus_to_visible_window(struct river_seat_v1 *river_seat)
 		return;
 	}
 
-	// Prefer the window the user was on before this one when it is
-	// still visible: it is where the focus came from, and where
-	// focus_window_previous would return to.
-	struct river_window_v1 *next =
-	    seat->previous_focused_window(river_seat);
-	if (!next || !window_is_visible(next)) {
-		next = first_visible_window();
-	}
+	// Hand the keyboard to the topmost visible window: the one the
+	// user most recently brought to the front, which is what labwc's
+	// desktop_focus_topmost_view() does.
+	struct river_window_v1 *next = topmost_visible_window();
 	if (next) {
 		seat->focus(river_seat, next);
 	} else {
@@ -219,6 +205,14 @@ void View::add_window(struct river_window_v1 *window)
 	// visibility starts true and the first render pass sends nothing.
 	window_entry->desktop = active_desktop;
 	window_entry->shown = true;
+
+	// A new window starts at the front of the stacking order, the way
+	// labwc inserts a mapped view at the head of its list. The record
+	// advances now so a fallback that runs before the next render
+	// sequence already sees the new window as the topmost one; the
+	// actual place_top goes out in that sequence (render-only in v5).
+	window_entry->z_order = next_z_order++;
+	window_entry->raise_pending = true;
 
 	// Single get_node call: the returned proxy is owned by this window
 	// entry.

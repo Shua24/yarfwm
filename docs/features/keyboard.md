@@ -59,7 +59,29 @@ guard — is therefore yarfwm's to implement and document.
 - Directional focus, directional window moves, window state actions (maximize,
   fullscreen, always-on-top, minimize/restore), geometry actions (center, fit,
   resize by percent), virtual desktop switching, spawn, close and exit_session —
-  28 distinct actions, all implemented.
+  30 distinct actions, all implemented.
+- **Minimize follows labwc's Iconify** (2026-09-25): minimizing works on the
+  **whole window hierarchy** — a dialog and its toplevel go together, whichever
+  one asked, the way labwc minimizes the root and then every sub-view
+  (`src/view.c:784-816`). Restore brings back the **most recently minimized**
+  hierarchy, selected by minimize order rather than array position, and hands it
+  the keyboard and the front of the stack. Both are bound by default
+  (`Super+M` / `Super+Shift+M`), and restoring a window that was minimized on
+  another virtual desktop brings that desktop forward so the window is actually
+  visible (`src/desktop.c:142-148`). A taskbar still cannot restore one — that
+  path is river-side and impossible here (`docs/features/panel-taskbar.md`).
+- **Window stacking order** (labwc-resemblance batch): clicking a window
+  focuses **and raises** it, a newly mapped window starts at the front, an
+  un-minimized window comes back to the front, and the focus fallbacks (close,
+  minimize, desktop switch, lock restore) hand the keyboard to the **topmost
+  visible window** — the same choice labwc's `desktop_focus_topmost_view()`
+  makes. yarfwm keeps its own stacking record (`Window::z_order`) because the
+  protocol has no stacking query, and every `place_top`/`place_bottom`/
+  `place_above` goes out in the **render** sequence, which is the only sequence
+  v5 allows for them.
+- **Exact maximize restore**: un-maximizing restores the pre-maximize geometry
+  (position and size), the way labwc restores `natural_geometry`; the old
+  behavior recomputed half the placement area and lost the position.
 - **Keyboard pointer movement** (`move_pointer_left`/`_right`/`_up`/`_down`,
   `Super+Shift` + arrows): moves the pointer one 32px step per press through
   `river_seat_v1.pointer_warp` (manage-sequence-only, so the offset is recorded

@@ -25,7 +25,7 @@ Pre-1.0, under active development. Verified live on 2026-09-23 against river
   (verified with `foot`)
 - Supports layer shell: wallpaper clients and bars map correctly, including
   exclusive-zone tracking (verified with `swaybg`, `wbg` and `waybar`)
-- Keyboard bindings: all 44 binds in the default config register per seat
+- Keyboard bindings: all 46 binds in the default config register per seat
   (nothing is skipped), and spawn / close / directional focus / focus-previous /
   exit-session fires on injected key events (verified with `wtype`; see
   `docs/keybinds.md`)
@@ -35,10 +35,10 @@ Pre-1.0, under active development. Verified live on 2026-09-23 against river
   pointer; see `docs/keybinds.md`)
 - Key repeat: a held focus binding repeats (verified with `wtype` holding
   `Super+Right` for 1.5s → 29 repeats; a held `spawn` still fires once)
-- Pointer focus: click-to-focus and focus-follows-mouse both focus the window
-  under a virtual pointer, and the setting is honoured — with
-  `focus_follows_mouse: false` a motion focuses nothing (verified with
-  `zwlr_virtual_pointer_v1`)
+- Pointer focus: **click-to-focus is the default** (`focus_follows_mouse:
+  false`, the labwc default); a click focuses and raises the window. With
+  `focus_follows_mouse: true` a pointer motion also focuses the window under it
+  (verified with `zwlr_virtual_pointer_v1`)
 - Lock screen: after a lock surface releases the keyboard the focused window is
   re-focused, so typing resumes without a click (verified with `swaylock`;
   without the fix the same probe leaves the keyboard unfocused)
@@ -58,6 +58,11 @@ Not implemented yet:
   would mean drawing the decoration, which needs a renderer yarfwm does not
   have. Compositor-drawn borders (`set_borders`) are a candidate for a later
   batch.
+- Panel/taskbar integration — a taskbar entry cannot restore a minimized
+  window: the click is dropped by river itself (no window-manager hook exists),
+  and the virtual desktops cannot be shown in a panel. Accepted and documented
+  in `docs/features/panel-taskbar.md`; restore works through the
+  `restore_minimized_window` binding.
 
 ## Requirements
 
@@ -221,10 +226,11 @@ view → keybind. Dependency direction, top to bottom:
    render-only requests → `render_finish`. Skipping a finish stalls river's loop.
 3. **The protocol in the repo is v6, but river 0.4.8 enforces v5 sequencing.**
    The client binds `min(advertised, 6)`, so it binds at 5 today. In v5,
-   `set_position` and `show` are render-sequence-only, while
-   `propose_dimensions`, `set_capabilities` and `set_default` are
-   manage-sequence-only. Never send v6-only members (`op_start_touch`,
-   `op_end_touch` and the touch events) until river advertises v6.
+   `set_position`, `show`/`hide` and every `place_*` request are
+   render-sequence-only, while `propose_dimensions`, `set_capabilities` and
+   `set_default` are manage-sequence-only. Never send v6-only members
+   (`op_start_touch`, `op_end_touch` and the touch events) until river
+   advertises v6.
 4. **Wayland proxy ownership.** The `wl_registry` belongs to `Server`; other
    units borrow it. Destroying a proxy twice segfaults at shutdown — this
    happened with the registry and is now guarded by convention.

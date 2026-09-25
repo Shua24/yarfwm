@@ -16,10 +16,11 @@ two sequence handlers in `src/ViewSequences.cpp`:
 - `window_manager_manage_start` (`src/ViewSequences.cpp:25`) proposes
   dimensions for unmanaged windows, points layer shell at a default output,
   sends pending resize proposals, applies recorded window state (maximized,
-  fullscreen, always-on-top, minimized, parent stacking), sends close requests,
-  then runs the key binding and seat `apply_manage()` paths, and finishes.
-- `window_manager_render_start` (`src/ViewSequences.cpp:195`) applies the
-  show/hide visibility pass (desktop + minimized state) and the placement pass
+  fullscreen, minimized), sends close requests, then runs the key binding and
+  seat `apply_manage()` paths, and finishes.
+- `window_manager_render_start` (`src/ViewSequences.cpp:177`) applies the
+  show/hide visibility pass (desktop + minimized state), the stacking pass
+  (pending raises, always-on-top, parent stacking), and the placement pass
   (`place_windows()`), then finishes.
 
 ## Justification
@@ -32,11 +33,12 @@ loop.
 ## The v5/v6 rule
 
 The vendored protocol XML is v6, but river 0.4.8 enforces v5 sequencing, so the
-client binds `min(advertised, 6)`. In v5, `set_position` and `show` are
-render-sequence-only, while `propose_dimensions`, `set_capabilities`,
-`set_default`, `close`, and the state requests are manage-sequence-only. The
-code never sends the v6-only members (`op_start_touch`/`op_end_touch` and the
-touch events) until river advertises v6.
+client binds `min(advertised, 6)`. In v5, `set_position`, `show`/`hide` and
+every `place_*` request are render-sequence-only, while `propose_dimensions`,
+`set_capabilities`, `set_default`, `close`, and the state requests are
+manage-sequence-only. The code never sends the v6-only members
+(`op_start_touch`/`op_end_touch` and the touch events) until river advertises
+v6.
 
 ## Bugs fixed in this area
 

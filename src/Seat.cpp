@@ -7,7 +7,7 @@
 #include <cstdio>
 #include <cstring>
 
-Seat::Seat() : seat_count(0), focus_follows_mouse(true), view(nullptr)
+Seat::Seat() : seat_count(0), focus_follows_mouse(false), view(nullptr)
 {
 	std::memset(seat_entries, 0, sizeof(seat_entries));
 	pointer_operation.kind = PointerOperation::kind_none;
@@ -29,7 +29,7 @@ bool Seat::initialize(Server *server, Display *display, Config &config)
 	(void)display;
 
 	focus_follows_mouse =
-	    config.input.get("focus_follows_mouse", true).asBool();
+	    config.input.get("focus_follows_mouse", false).asBool();
 	return true;
 }
 
@@ -198,24 +198,14 @@ void Seat::forget_window(struct river_window_v1 *window)
 			continue;
 		}
 
-		// The focused window is gone. Fall back to the most recently
-		// focused survivor when it is still visible, then to the
-		// first visible window, and clear the keyboard focus only
-		// when nothing is visible: a hidden window must never take
-		// the keyboard.
+		// The focused window is gone. The keyboard goes to the
+		// topmost visible window — the one the user most recently
+		// brought to the front — and is cleared only when nothing
+		// is visible: a hidden window must never take the keyboard.
 		entry->focused_window = nullptr;
 
-		// A hidden window must never take the keyboard: the
-		// previous window may have been left behind on another
-		// desktop (or minimized) since it was focused.
 		struct river_window_v1 *fallback =
-		    entry->previous_focused_window;
-		if (fallback && view && !view->window_is_visible(fallback)) {
-			fallback = nullptr;
-		}
-		if (!fallback && view) {
-			fallback = view->first_visible_window();
-		}
+		    view ? view->topmost_visible_window() : nullptr;
 
 		if (fallback) {
 			entry->pending_focus_window = fallback;
@@ -256,20 +246,14 @@ void Seat::restore_focus()
 		// The window to put the keyboard back on. It may have been
 		// hidden since it was focused (a desktop switch or a
 		// minimize) or died while the screen was locked: fall back
-		// the way forget_window() does, and only to a visible
-		// window.
+		// the way forget_window() does — to the topmost visible
+		// window, and only to a visible one.
 		struct river_window_v1 *target = entry->focused_window;
 		if (target && view && !view->window_is_visible(target)) {
 			target = nullptr;
 		}
 		if (!target && view) {
-			struct river_window_v1 *previous =
-			    entry->previous_focused_window;
-			if (previous && view->window_is_visible(previous)) {
-				target = previous;
-			} else {
-				target = view->first_visible_window();
-			}
+			target = view->topmost_visible_window();
 		}
 		if (!target) {
 			continue;
