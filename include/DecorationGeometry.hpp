@@ -70,8 +70,10 @@ TitlebarPart titlebar_part_at(const TitlebarMetrics &metrics,
 			      int visible_button_count, TitlebarPoint point);
 
 // Where the titlebar surface ends up relative to the window's CONTENT
-// rectangle. The bar is never drawn over the content: a decoration that covers
-// the window it decorates is the bug this enum exists to prevent.
+// rectangle. Outside the content by default: a decoration that covers the
+// window it decorates is the bug this enum exists to prevent. The single
+// exception is titlebar_placement_overlap, which a MAXIMIZED window may
+// request because it has no outside left to put a bar in.
 enum TitlebarPlacement {
 	// Outside, above the content's top edge. This is the normal case, and
 	// the only one a correctly placed window ever needs: the placement pass
@@ -88,6 +90,21 @@ enum TitlebarPlacement {
 	// user dragged flush against the top edge with no room below it gets,
 	// and it is deliberately a lost titlebar rather than a covered window.
 	titlebar_placement_hidden,
+	// No room outside the content anywhere, but the caller asked for the
+	// overlap exception (allow_overlap) because the window is MAXIMIZED.
+	// The bar is drawn INSIDE the content's top edge, covering the top
+	// titlebar_height rows of the window.
+	//
+	// Why this exists: a maximized window fills the whole placement area,
+	// so there is nowhere outside it to put a bar, and hiding the bar costs
+	// the user its buttons and its identity. Maximized is also the one case
+	// where the covered rows are not "the user's content": the window asked
+	// to be maximized, and every other WM keeps some chrome there.
+	//
+	// It is opt-in per call and only ever set for a maximized window, so
+	// the ordinary floating case keeps the strict no-cover guarantee that
+	// titlebar_placement_hidden provides.
+	titlebar_placement_overlap,
 };
 
 // Where the titlebar sits relative to the window's CONTENT rectangle, given
@@ -108,6 +125,12 @@ enum TitlebarPlacement {
 // screen by drawing it INSIDE the content's top edge, which covered the top
 // titlebar_height rows of the window: the bug this contract fixes.
 //
+// allow_overlap is the one sanctioned way back to covering the content, and
+// the caller must only set it for a MAXIMIZED window (a window with nowhere
+// outside itself to put a bar). With it false the strict behaviour is
+// unchanged: nowhere outside means titlebar_placement_hidden and the window
+// keeps every pixel.
+//
 // border_width is the compositor's border (river_window_v1.set_borders), which
 // is drawn OUTSIDE the content: the top border occupies the rows
 // [-border_width, 0) relative to the content's top edge (river/Window.zig:1011-
@@ -120,7 +143,8 @@ enum TitlebarPlacement {
 TitlebarPlacement titlebar_offset(int32_t titlebar_height, int32_t border_width,
 				  const Rectangle &content,
 				  const Rectangle &placement_area,
-				  int32_t *offset_x, int32_t *offset_y);
+				  bool allow_overlap, int32_t *offset_x,
+				  int32_t *offset_y);
 
 // The placement area with the frame's top margin reserved at its top, for a
 // window that is going to be decorated. Placement puts windows in this

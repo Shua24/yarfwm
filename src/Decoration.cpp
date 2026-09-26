@@ -169,9 +169,13 @@ bool Decoration::update(const Rectangle &new_content_geometry,
 	// content and the bar must clear those rows.
 	int32_t offset_x = 0;
 	int32_t offset_y = 0;
+	// A MAXIMIZED window is the one caller allowed to keep its bar by
+	// covering the content's top rows: it fills the whole placement area,
+	// so there is nowhere outside it for the bar to go. Everything else
+	// keeps the strict no-cover rule.
 	const TitlebarPlacement new_placement = titlebar_offset(
 	    metrics.height, settings.border_width, content_geometry,
-	    placement_area, &offset_x, &offset_y);
+	    placement_area, maximized, &offset_x, &offset_y);
 	const bool placement_moved = new_placement != placement;
 	placement = new_placement;
 	if (placement == titlebar_placement_hidden) {
@@ -235,9 +239,14 @@ TitlebarPlacement Decoration::apply_offset(const Rectangle &area)
 	// from this pass every sequence, and river keeps the last value it saw.
 	// Leaving a stale offset behind after the bar lost its room would put
 	// the surface back over the window.
-	const TitlebarPlacement where =
-	    titlebar_offset(metrics.height, settings.border_width,
-			    content_geometry, area, &offset_x, &offset_y);
+	//
+	// `maximized` is passed so the two passes agree: a maximized window
+	// keeps its bar by overlapping the content's top rows (see
+	// titlebar_offset's allow_overlap), and both the paint decision and the
+	// offset have to make the same choice.
+	const TitlebarPlacement where = titlebar_offset(
+	    metrics.height, settings.border_width, content_geometry, area,
+	    maximized, &offset_x, &offset_y);
 	placement = where;
 	river_decoration_v1_set_offset(decoration, offset_x, offset_y);
 	return where;

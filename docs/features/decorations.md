@@ -72,13 +72,23 @@ room.**
 The bar belongs outside the content. Getting there took two changes, because
 either one alone leaves a hole:
 
-*Placement reserves the frame's top strip.* `View::content_area()` is the
-placement area with `titlebar_height + border_width` reserved at its top, and
-that — not `placement_area()` — is what `place_windows()`,
-`propose_default_dimensions()`, maximize, `fit_to_output` and `center_window`
-fill. A window placed at the reserved origin therefore has exactly the room the
-bar needs above it, so `set_offset(0, -(h + b))` lands the bar above the window
-with neither the content nor the border row covered.
+*Placement reserves the frame's top strip — for floating windows.*
+`View::content_area()` is the placement area with `titlebar_height + border_width`
+reserved at its top, and that — not `placement_area()` — is what
+`place_windows()`, `propose_default_dimensions()`, `fit_to_output` and
+`center_window` fill. A window placed at the reserved origin therefore has
+exactly the room the bar needs above it, so `set_offset(0, -(h + b))` lands the
+bar above the window with neither the content nor the border row covered.
+
+*But maximize and the post-fullscreen restore use `placement_area()`.* Those two
+fill the area rather than floating inside it, and reserving the strip there made
+an SSD window one strip (27px) smaller **and** one strip lower than a CSD window
+— a placement bug, not a size bug, which is why users saw the window sit below
+its neighbours' decorations while being correctly sized. Both paths use the full
+panel-adjusted area; see `src/ViewWindowState.cpp` (`toggle_maximize`,
+`set_fullscreen`). The rule of thumb: reserve the strip only when the window will
+have a bar **above** it. Maximized and restored windows do not, so they take the
+whole area and the bar overlaps instead (next section).
 
 *The offset refuses to cover the content, and clears the border too.*
 `titlebar_offset()` returns a `TitlebarPlacement`. `b` is `border_width`, which
@@ -91,7 +101,16 @@ bar wins every row it covers (`river-window-management-v1.xml:1199-1202`):
 | --- | --- | --- |
 | `>= h + b` above the content, inside the area | `titlebar_placement_above` | `(0, -(h + b))` |
 | not above, but `>= h + b` below | `titlebar_placement_below` | `(0, +content.height + b)` |
-| neither | `titlebar_placement_hidden` | nothing painted |
+| neither, and `allow_overlap` is false (every floating window) | `titlebar_placement_hidden` | nothing painted |
+| neither, and `allow_overlap` is true (a MAXIMIZED window) | `titlebar_placement_overlap` | `(0, 0)`, covering the content's top `h` rows |
+
+`allow_overlap` is the one sanctioned exception to "never cover the window it
+decorates", and only `Decoration`'s two `titlebar_offset()` calls pass it, and
+only when the window is maximized. A maximized window fills the whole area, so
+without the exception it would lose its bar entirely — no title, no buttons. The
+covered rows are the window's own top `h` rows, which is the trade every other WM
+makes for maximized chrome. Floating windows keep the strict guarantee: nowhere
+outside means no bar, never a covered window.
 
 **The border row bug.** With the plain `-h` offset the bar's bottom row lands
 exactly on the top border row, and because the bar is painted last it hides it:
@@ -115,28 +134,35 @@ flat-colour probe window: the content's rows `0..25` — exactly
 
 **Measured after the fix** (headless river, magenta probe window, one grim
 screenshot per arm; the full matrix is in
-`.hermes/notes/2026-09-26-decor-border/decoration-overlap-fix.md`):
+`.hermes/notes/2026-09-26-decor-border/decoration-overlap-fix.md`, and the
+maximized rows were re-measured with a control binary for the
+`placement_area()` change):
 
 | arm | bar rows | rows between bar and content | content rows | verdict |
 |---|---|---|---|---|
 | fixed, floating | 0..25 | 26 (641/1280 border px) | 27..372 (346) | nothing covered |
 | control (installed, pre-fix), floating | 0..25 | none | 26..359 (334) | 26 rows covered |
-| fixed, maximized | 0..25 | 26 (1280/1280 border px) | 27..719 (693) | nothing covered |
-| control, maximized | 0..25 | none | 26..719 (694) | 26 rows covered |
+| fixed, maximized, overlap (current) | 0..25 | none — the bar overlaps | 0..719 (720 total) | bar covers the window's own top 26 rows |
+| maximize via `content_area()` (pre-this-fix) | 0..25 | 26 (1280/1280 border px) | 27..719 (693) | 27px short **and** 27px low vs a CSD window |
 
-The vertical order through a fixed window reads bar `#203040`, then one focus
-border row `#5c8fb0`, then content: the window is moved down by the reserved
-strip rather than shrunk, so no content is lost.
+The vertical order through a fixed *floating* window reads bar `#203040`, then
+one focus border row `#5c8fb0`, then content: the window is moved down by the
+reserved strip rather than shrunk, so no content is lost. A *maximized* window
+has no strip to move into, so the bar is drawn over the content's top rows
+instead and the focus border row sits underneath it — see the overlap row above.
 
-The replacement keeps the bar visible without covering anything: the reserved
-strip moves the window down instead. `titlebar_placement_below` covers the case
-where the user drags a window to the area's top edge by hand (there is no room
-above it any more, but the bar can go under it), and `titlebar_placement_hidden`
-covers a window that fills the area on both axes — a lost bar is a smaller loss
-than a window with its top rows hidden. The maximized case now measures as
-content at `y 27..719` with the bar at `y 0..25` and the border row at `y 26`:
-nothing covered. `titlebar_when_maximized: false` still hides the bar entirely,
-which is what that key is for.
+The replacement keeps the bar visible without covering a floating window's
+content: the reserved strip moves the window down instead.
+`titlebar_placement_below` covers the case where the user drags a window to the
+area's top edge by hand (there is no room above it any more, but the bar can go
+under it), and `titlebar_placement_hidden` covers a window that fills the area on
+both axes — a lost bar is a smaller loss than a window with its top rows hidden.
+A **maximized** window is the one exception, and it opts in explicitly
+(`allow_overlap`): it fills the whole area, so the alternative is losing the bar
+entirely, and the rows it covers are its own top 26. Measured: content at
+`y 0..719` with the bar over `y 0..25`, and the window sized to the full
+`1280x720` area like a CSD client. `titlebar_when_maximized: false` still hides
+the bar entirely, which is what that key is for.
 
 Two consequences worth knowing:
 

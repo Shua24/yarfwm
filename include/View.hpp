@@ -394,16 +394,23 @@ class View
 	void placement_area(int32_t *x, int32_t *y, int32_t *width,
 			    int32_t *height) const;
 
-	// The rectangle windows are actually placed in: the placement area with
+	// The rectangle floating windows are placed in: the placement area with
 	// the titlebar's strip reserved at its top, so a window put here has
 	// room for its own bar above it and the bar never has to cover the
 	// window. Equal to placement_area() when decorations are off, because
 	// then there is no bar to make room for.
 	//
-	// Every geometry action that fills the area (maximize, fit_to_output,
-	// center) uses this rather than placement_area(), or the window would
-	// end up flush with the area's top edge and its bar would have to go
-	// below it or not be painted at all.
+	// NOT for maximize or the post-fullscreen restore. Those must use
+	// placement_area(): they fill the area, and subtracting the strip makes
+	// an SSD window one strip smaller and one strip lower than a CSD
+	// window, which is the placement bug fixed in src/ViewWindowState.cpp.
+	// The rule of thumb is whether the window will have a bar ABOVE it --
+	// floating windows do (use this), maximized and restored ones do not
+	// (use placement_area()).
+	//
+	// The other geometry actions that fill the area (fit_to_output, center)
+	// still use this one, so a fitted or centred window keeps room for its
+	// bar rather than sitting flush against the area's top edge.
 	void content_area(int32_t *x, int32_t *y, int32_t *width,
 			  int32_t *height) const;
 

@@ -120,9 +120,33 @@ void View::toggle_maximize(struct river_window_v1 *window)
 		// output minus the exclusive zones of bars and docks. River
 		// keeps the window manager responsible for the geometry of a
 		// maximized window, so this is a position and a proposal like
-		// any other.
+		// any other. This is to work around GTK windows setting its
+    // own rules upon fullscreen (damn you, GTK).
+		//
+		// placement_area(), NOT content_area(). The only difference
+		// between the two is the reserved titlebar strip
+		// (titlebar_height + border_width -- 27px with the shipped
+		// config) that content_area() subtracts from the top of the
+		// area. Subtracting it here is the bug this line fixes: a
+		// maximized SSD window was sized correctly but landed one
+		// strip lower than a CSD window, so it sat below the
+		// decorations of its neighbours. Users notice, because the
+		// window is the right size in the wrong place.
+		//
+		// Maximize and the post-fullscreen restore (see
+		// set_fullscreen below) are the only two paths that must use
+		// the FULL area. Floating placement still uses content_area()
+		// -- View::place_windows -- because there the bar genuinely
+		// has to sit above the window. Do not "tidy" this back to
+		// content_area(); that reintroduces the bug.
+		// (Damn you, GTK developers for making the windows
+    // draw itself via CSD even on Wayland)
+    //
+		// Measured with a control binary on a 1280x720 output:
+		// content_area() proposes 1280x693, placement_area() proposes
+		// 1280x720.
 		Rectangle area{0, 0, 0, 0};
-		content_area(&area.x, &area.y, &area.width, &area.height);
+		placement_area(&area.x, &area.y, &area.width, &area.height);
 		set_user_geometry(window, area);
 		propose_user_dimensions(window, area);
 	} else if (window_entry->has_saved_geometry) {
@@ -135,8 +159,14 @@ void View::toggle_maximize(struct river_window_v1 *window)
 		// No saved geometry (a maximize that never saw a placed
 		// window): fall back to half the placement area. The window
 		// keeps where it was put.
+		//
+		// placement_area() for the same reason as the branch above:
+		// the half-area fallback is a fraction OF the area, so
+		// computing it from the strip-reduced content_area() would
+		// restore an SSD window to a smaller half than a CSD window
+		// gets. Same class of inconsistency, same fix.
 		Rectangle area{0, 0, 0, 0};
-		content_area(&area.x, &area.y, &area.width, &area.height);
+		placement_area(&area.x, &area.y, &area.width, &area.height);
 		Rectangle restored =
 		    window_entry->has_user_geometry
 			? window_entry->user_geometry
@@ -197,8 +227,19 @@ void View::set_fullscreen(struct river_window_v1 *window, bool fullscreen,
 		// set_position requests is completed". So re-propose the
 		// size here and let the render sequence that follows place
 		// it, rather than leaving the window unplaced.
+		//
+		// placement_area(), NOT content_area(): leaving fullscreen
+		// restores into the FULL panel-adjusted area, so an SSD
+		// client lands on the same rectangle a CSD client does
+		// rather than one titlebar strip lower.
+		//
+		// This is the same defect as the maximize branch above, on a
+		// different path, which is why it carries the same fix. It
+		// only bites when there is no saved geometry (the window was
+		// never placed), because otherwise `restored` comes from
+		// user_geometry and the area is not consulted at all.
 		Rectangle area{0, 0, 0, 0};
-		content_area(&area.x, &area.y, &area.width, &area.height);
+		placement_area(&area.x, &area.y, &area.width, &area.height);
 		Rectangle restored =
 		    window_entry->has_user_geometry
 			? window_entry->user_geometry

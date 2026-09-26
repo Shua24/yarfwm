@@ -144,6 +144,11 @@ TEST(TitlebarHitTest, OutsideTheSurfaceIsNone)
 // which covered the top titlebar_height rows of every window placed at the area
 // origin. That was measured on a real window: the content's top 26 rows were
 // titlebar pixels.
+//
+// The one exception is a MAXIMIZED window, which opts into the overlap
+// placement: it fills the whole area, so it would otherwise lose its bar
+// entirely. Every other caller passes allow_overlap = false and keeps the
+// strict no-cover guarantee.
 
 // The bar clears the compositor's border as well as the content. river draws
 // the border OUTSIDE the content -- the top border occupies the border_width
@@ -162,7 +167,7 @@ TEST(TitlebarOffset, SitsAboveTheContentAndSpansItsWidth)
 	int32_t x = 123;
 	int32_t y = 123;
 	const TitlebarPlacement where =
-	    titlebar_offset(26, border, content, area, &x, &y);
+	    titlebar_offset(26, border, content, area, false, &x, &y);
 	EXPECT_EQ(where, titlebar_placement_above);
 	EXPECT_EQ(x, 0);
 	// 26 for the bar plus 1 for the border row the bar must clear.
@@ -185,7 +190,7 @@ TEST(TitlebarOffset, AWindowFlushWithTheAreaTopGetsTheBarBelowItNotOverIt)
 	int32_t x = 123;
 	int32_t y = 123;
 	const TitlebarPlacement where =
-	    titlebar_offset(26, border, content, area, &x, &y);
+	    titlebar_offset(26, border, content, area, false, &x, &y);
 	EXPECT_EQ(where, titlebar_placement_below);
 	EXPECT_EQ(x, 0);
 	// The bar's top edge is past the content's bottom border row: the
@@ -202,13 +207,62 @@ TEST(TitlebarOffset, NoRoomOnEitherSideMeansNoBarRatherThanACoveredWindow)
 	const Rectangle area{0, 0, 1280, 720};
 	int32_t x = 123;
 	int32_t y = 123;
-	EXPECT_EQ(titlebar_offset(26, border, content, area, &x, &y),
+	EXPECT_EQ(titlebar_offset(26, border, content, area, false, &x, &y),
 		  titlebar_placement_hidden);
 	// The offset is still defined even though nothing is painted: river
 	// keeps the last set_offset it saw, so a stale one would put the
 	// surface back over the window.
 	EXPECT_EQ(x, 0);
 	EXPECT_EQ(y, 0);
+}
+
+TEST(TitlebarOffset, AMaximizedWindowMayKeepItsBarByCoveringTheContentTop)
+{
+	// The same nowhere-to-go geometry as the test above, but with the
+	// overlap exception a MAXIMIZED window opts into. The bar is kept and
+	// drawn at the very top of the content, covering exactly the top
+	// titlebar_height rows.
+	//
+	// Why a maximized window is allowed this when nothing else is: it
+	// fills the whole placement area, so there is no outside left to put a
+	// bar in, and losing the bar costs its buttons and its identity. The
+	// covered rows are also not the user's content in the way a floating
+	// window's would be -- the window asked to be maximized.
+	const Rectangle content{0, 0, 1280, 720};
+	const Rectangle area{0, 0, 1280, 720};
+	int32_t x = 123;
+	int32_t y = 123;
+	EXPECT_EQ(titlebar_offset(26, border, content, area, true, &x, &y),
+		  titlebar_placement_overlap);
+	// Offset 0 puts the surface's first row on the content's first row, so
+	// it covers [content.y, content.y + 26).
+	EXPECT_EQ(x, 0);
+	EXPECT_EQ(y, 0);
+	// The covered band is inside the content, not above it.
+	EXPECT_GE(content.y + y, content.y);
+	EXPECT_LE(content.y + y + 26, content.y + content.height);
+}
+
+TEST(TitlebarOffset, OverlapIsNotUsedWhenTheBarFitsOutside)
+{
+	// allow_overlap must not change the ordinary cases: a window that
+	// still has room outside gets its bar outside like anything else. The
+	// exception is a last resort, not a mode.
+	const Rectangle area{0, 0, 1280, 720};
+	int32_t x = 0;
+	int32_t y = 0;
+
+	// Room above: still above, and the bar covers nothing.
+	EXPECT_EQ(titlebar_offset(26, border, Rectangle{0, 64, 640, 300}, area,
+				  true, &x, &y),
+		  titlebar_placement_above);
+	EXPECT_EQ(y, -27);
+
+	// No room above but room below: still below, not overlapping.
+	EXPECT_EQ(titlebar_offset(26, border, Rectangle{0, 0, 640, 600}, area,
+				  true, &x, &y),
+		  titlebar_placement_below);
+	EXPECT_EQ(y, 600 + border);
 }
 
 TEST(TitlebarOffset, NeedsTheFullHeightOfRoomAboveNotJustOnePixel)
@@ -220,7 +274,7 @@ TEST(TitlebarOffset, NeedsTheFullHeightOfRoomAboveNotJustOnePixel)
 	// Exactly a bar plus a border row of room: the bar fits, so it goes
 	// above, clearing both the content and the border row.
 	EXPECT_EQ(titlebar_offset(26, border, Rectangle{0, 27, 640, 300}, area,
-				  &x, &y),
+				  false, &x, &y),
 		  titlebar_placement_above);
 	EXPECT_EQ(y, -27);
 
@@ -228,7 +282,7 @@ TEST(TitlebarOffset, NeedsTheFullHeightOfRoomAboveNotJustOnePixel)
 	// top edge, so it goes below the content instead of over it. The
 	// content is 26..325 and the area ends at 719, so there is room below.
 	EXPECT_EQ(titlebar_offset(26, border, Rectangle{0, 26, 640, 300}, area,
-				  &x, &y),
+				  false, &x, &y),
 		  titlebar_placement_below);
 	EXPECT_EQ(y, 300 + border);
 }
@@ -239,7 +293,7 @@ TEST(TitlebarOffset, AZeroHeightBarIsNeverPainted)
 	const Rectangle area{0, 0, 1280, 720};
 	int32_t x = 1;
 	int32_t y = 1;
-	EXPECT_EQ(titlebar_offset(0, border, content, area, &x, &y),
+	EXPECT_EQ(titlebar_offset(0, border, content, area, false, &x, &y),
 		  titlebar_placement_hidden);
 	EXPECT_EQ(x, 0);
 	EXPECT_EQ(y, 0);
@@ -256,12 +310,12 @@ TEST(TitlebarOffset, AnAreaWithABarAboveItKeepsTheTitlebarOnScreen)
 	int32_t y = 0;
 	// The content is 37..719 and the area ends at 719, so there is no room
 	// below either: no bar.
-	EXPECT_EQ(titlebar_offset(26, border, maximized, area, &x, &y),
+	EXPECT_EQ(titlebar_offset(26, border, maximized, area, false, &x, &y),
 		  titlebar_placement_hidden);
 
 	// A floating window lower down has room, so it keeps the normal offset.
 	EXPECT_EQ(titlebar_offset(26, border, Rectangle{0, 200, 640, 300}, area,
-				  &x, &y),
+				  false, &x, &y),
 		  titlebar_placement_above);
 	EXPECT_EQ(y, -27);
 }
@@ -275,7 +329,7 @@ TEST(TitlebarOffset, AThickBorderPushesTheBarFurtherUp)
 	const Rectangle area{0, 0, 1280, 720};
 	int32_t x = 0;
 	int32_t y = 0;
-	EXPECT_EQ(titlebar_offset(26, 4, content, area, &x, &y),
+	EXPECT_EQ(titlebar_offset(26, 4, content, area, false, &x, &y),
 		  titlebar_placement_above);
 	EXPECT_EQ(y, -30);
 }
@@ -288,7 +342,7 @@ TEST(TitlebarOffset, NoBorderLeavesTheBarDirectlyAboveTheContent)
 	const Rectangle area{0, 0, 1280, 720};
 	int32_t x = 0;
 	int32_t y = 0;
-	EXPECT_EQ(titlebar_offset(26, 0, content, area, &x, &y),
+	EXPECT_EQ(titlebar_offset(26, 0, content, area, false, &x, &y),
 		  titlebar_placement_above);
 	EXPECT_EQ(y, -26);
 }
@@ -313,7 +367,7 @@ TEST(ReservedStrip, ReservesTheWholeFrameTopAtTheTopOfTheArea)
 	// titlebar_offset() requires, so the bar clears content and border.
 	int32_t x = 0;
 	int32_t y = 0;
-	EXPECT_EQ(titlebar_offset(26, border, content, area, &x, &y),
+	EXPECT_EQ(titlebar_offset(26, border, content, area, false, &x, &y),
 		  titlebar_placement_above);
 	EXPECT_EQ(y, -27);
 	EXPECT_EQ(content.y + y + 26, content.y - border);

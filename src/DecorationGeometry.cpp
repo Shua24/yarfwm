@@ -89,7 +89,8 @@ TitlebarPart titlebar_part_at(const TitlebarMetrics &metrics,
 TitlebarPlacement titlebar_offset(int32_t titlebar_height, int32_t border_width,
 				  const Rectangle &content,
 				  const Rectangle &placement_area,
-				  int32_t *offset_x, int32_t *offset_y)
+				  bool allow_overlap, int32_t *offset_x,
+				  int32_t *offset_y)
 {
 	// The surface is above or below the content and spans its width, so the
 	// x offset is always zero. river_decoration_v1.set_offset takes an i32
@@ -141,9 +142,22 @@ TitlebarPlacement titlebar_offset(int32_t titlebar_height, int32_t border_width,
 		return titlebar_placement_below;
 	}
 
-	// Fits nowhere outside the content: paint nothing. A window with no
-	// titlebar is a smaller loss than a window with its top rows hidden
-	// behind one.
+	// Fits nowhere outside the content.
+	//
+	// A maximized window fills the whole area, so this is its normal case,
+	// and the caller may opt into keeping the bar by covering the content's
+	// top rows instead of losing the bar. The bar goes at the very top of
+	// the content (offset 0) and covers [content.y, content.y +
+	// titlebar_height). Only a maximized window ever sets allow_overlap.
+	if (allow_overlap) {
+		if (offset_y) {
+			*offset_y = 0;
+		}
+		return titlebar_placement_overlap;
+	}
+
+	// Otherwise paint nothing. A window with no titlebar is a smaller loss
+	// than a window with its top rows hidden behind one.
 	return titlebar_placement_hidden;
 }
 
