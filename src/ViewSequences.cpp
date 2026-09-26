@@ -123,6 +123,25 @@ void View::window_manager_manage_start(void *data,
 		// sequence hides the window (restoring shows it again).
 	}
 
+	// Ask the client to stop drawing its own decorations. use_ssd is
+	// manage-sequence-only, and a decoration hint of only_supports_csd
+	// means the request is documented to have no effect, so it is not sent
+	// at all. The once-guard is cleared whenever the hint changes
+	// (View::apply_decoration_hint), because the XML lets a window re-send
+	// its preference at any time.
+	for (int i = 0; i < view->window_count; i++) {
+		Window *window_entry = &view->windows[i];
+		if (!window_entry->window) {
+			continue;
+		}
+		if (view->decorations_on && !window_entry->ssd_requested &&
+		    window_entry->decoration_hint !=
+			RIVER_WINDOW_V1_DECORATION_HINT_ONLY_SUPPORTS_CSD) {
+			river_window_v1_use_ssd(window_entry->window);
+			window_entry->ssd_requested = true;
+		}
+	}
+
 	// Close requests are manage-sequence-only; send one per window, once.
 	for (int i = 0; i < view->window_count; i++) {
 		Window *window_entry = &view->windows[i];
@@ -245,6 +264,12 @@ void View::window_manager_render_start(void *data,
 	}
 
 	view->place_windows();
+
+	// Decorations last: they need the placement place_windows() just wrote,
+	// and every request they make (set_borders, set_offset) is render-
+	// sequence-only under v5.
+	view->apply_decorations(view->seat ? view->seat->primary_river_seat()
+					   : nullptr);
 
 	// Mandatory: end the render sequence.
 	river_window_manager_v1_render_finish(manager);

@@ -1,5 +1,6 @@
 #include "Seat.hpp"
 #include "Config.hpp"
+#include "Display.hpp"
 #include "LayerShell.hpp"
 #include "View.hpp"
 #include "river-layer-shell-v1-client-protocol.h"
@@ -7,7 +8,10 @@
 #include <cstdio>
 #include <cstring>
 
-Seat::Seat() : seat_count(0), focus_follows_mouse(false), view(nullptr)
+Seat::Seat()
+    : seat_count(0), focus_follows_mouse(false), view(nullptr),
+      display(nullptr), hovered_surface(nullptr), pointer_surface_x(0),
+      pointer_surface_y(0)
 {
 	std::memset(seat_entries, 0, sizeof(seat_entries));
 	pointer_operation.kind = PointerOperation::kind_none;
@@ -26,7 +30,12 @@ bool Seat::initialize(Server *server, Display *display, Config &config)
 	// Dynamic memory: none yet; per-seat state is created lazily in
 	// attach_river_seat() when river hands the window manager a seat.
 	(void)server;
-	(void)display;
+	this->display = display;
+
+	// The seat owns the wl_pointer bindings; Display receives the
+	// capability events (they are a property of the wl_seat object) and
+	// forwards them here.
+	display->seat_owner = this;
 
 	focus_follows_mouse =
 	    config.input.get("focus_follows_mouse", false).asBool();
@@ -393,6 +402,12 @@ void Seat::apply_manage()
 void Seat::terminate()
 {
 	for (int i = 0; i < seat_count; i++) {
+		// The pointer before the seat it came from: a wl_pointer is a
+		// child object and must not outlive its wl_seat.
+		if (seat_entries[i].pointer) {
+			wl_pointer_destroy(seat_entries[i].pointer);
+			seat_entries[i].pointer = nullptr;
+		}
 		if (seat_entries[i].layer_shell_seat) {
 			river_layer_shell_seat_v1_destroy(
 			    seat_entries[i].layer_shell_seat);
@@ -405,4 +420,6 @@ void Seat::terminate()
 	}
 	seat_count = 0;
 	view = nullptr;
+	display = nullptr;
+	hovered_surface = nullptr;
 }

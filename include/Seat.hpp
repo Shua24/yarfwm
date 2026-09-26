@@ -176,6 +176,62 @@ class Seat
 	// Whether an interactive move or resize is in progress.
 	bool pointer_operation_active() const;
 
+	// The wl_pointer for a seat, used for exactly one thing: the window
+	// manager's own surfaces. River routes a press on a window to
+	// river_seat_v1.window_interaction, but a press on a decoration surface
+	// -- which has no scene-node data for river to resolve -- arrives here
+	// as an ordinary wl_pointer event on our own surface. That is the only
+	// channel that can tell a titlebar button from a titlebar bar.
+	//
+	// Every slot is populated: libwayland aborts the process (SIGABRT) when
+	// an event arrives for a NULL listener slot, and wl_pointer is a child
+	// of wl_seat, so it takes the seat's advertised version (v9 here) and
+	// the v8/v9 slots are reachable in practice.
+	static void pointer_enter(void *data, struct wl_pointer *pointer,
+				  uint32_t serial, struct wl_surface *surface,
+				  wl_fixed_t surface_x, wl_fixed_t surface_y);
+	static void pointer_leave(void *data, struct wl_pointer *pointer,
+				  uint32_t serial, struct wl_surface *surface);
+	static void pointer_motion(void *data, struct wl_pointer *pointer,
+				   uint32_t time, wl_fixed_t surface_x,
+				   wl_fixed_t surface_y);
+	static void pointer_button(void *data, struct wl_pointer *pointer,
+				   uint32_t serial, uint32_t time,
+				   uint32_t button, uint32_t state);
+	static void pointer_axis(void *data, struct wl_pointer *pointer,
+				 uint32_t time, uint32_t axis,
+				 wl_fixed_t value);
+	static void pointer_frame(void *data, struct wl_pointer *pointer);
+	static void pointer_axis_source(void *data, struct wl_pointer *pointer,
+					uint32_t source);
+	static void pointer_axis_stop(void *data, struct wl_pointer *pointer,
+				      uint32_t time, uint32_t axis);
+	static void pointer_axis_discrete(void *data,
+					  struct wl_pointer *pointer,
+					  uint32_t axis, int32_t discrete);
+	static void pointer_axis_value120(void *data,
+					  struct wl_pointer *pointer,
+					  uint32_t axis, int32_t value120);
+	static void pointer_axis_relative_direction(void *data,
+						    struct wl_pointer *pointer,
+						    uint32_t axis,
+						    uint32_t direction);
+	static void pointer_warp(void *data, struct wl_pointer *pointer,
+				 wl_fixed_t surface_x, wl_fixed_t surface_y);
+
+	// Bind or release the wl_pointer to match the seat's advertised
+	// pointer capability. Called from Display::seat_capabilities, which is
+	// where the capability event lands: wl_seat.get_pointer is a PROTOCOL
+	// ERROR unless the seat has advertised the pointer capability at some
+	// point, and a headless session with no input devices
+	// (WLR_LIBINPUT_NO_DEVICES=1) starts with NO capabilities at all. The
+	// pointer therefore cannot be bound when river names the seat -- it
+	// has to wait for this. Getting it wrong kills the window manager at
+	// startup with "wl_seat.get_pointer called when no pointer capability
+	// has existed".
+	void update_pointer_capability(struct wl_seat *wl_seat,
+				       bool has_pointer);
+
       private:
 	// Shared body of start_pointer_operation and start_touch_operation;
 	// the two differ only in which op_start request is sent and whether a
@@ -222,6 +278,13 @@ class Seat
 		LayerSurfaceFocus layer_surface_focus;
 		bool removed;
 
+		// The wl_seat this entry corresponds to, from the name river
+		// reports in river_seat_v1.wl_seat, and the wl_pointer bound
+		// from it. The pointer exists for the window manager's own
+		// decoration surfaces only.
+		struct wl_seat *wl_seat;
+		struct wl_pointer *pointer;
+
 		// Focus state. previous_focused_window is what
 		// focus_window_previous returns to;
 		// pending_focus_window/pending_clear_focus is the intent
@@ -246,6 +309,9 @@ class Seat
 
 	SeatEntry *find_entry(struct river_seat_v1 *river_seat);
 	const SeatEntry *find_entry(struct river_seat_v1 *river_seat) const;
+	// The entry owning this wl_seat, or null. Declared here, after
+	// SeatEntry is complete.
+	SeatEntry *find_entry_by_wl_seat(struct wl_seat *wl_seat);
 	void record_focus(SeatEntry *entry, struct river_window_v1 *window);
 
 	// river_seat_v1 events. Every slot must be non-NULL: libwayland aborts
@@ -297,6 +363,22 @@ class Seat
 	int seat_count;
 	bool focus_follows_mouse;
 	View *view;
+
+	// Needed to resolve the wl_seat river names in river_seat_v1.wl_seat
+	// into the object a wl_pointer is bound from.
+	Display *display;
+
+	// The surface the pointer is currently on, and the last surface-local
+	// position river reported for it. A press carries NO coordinates of its
+	// own (only enter and motion do), so this cache is the only source for
+	// where a click landed.
+	//
+	// Per seat in principle, but a single pointer drives one surface at a
+	// time and yarfwm acts on the seat the press arrived on, so one cache
+	// is enough -- the same reasoning pointer_operation uses.
+	struct wl_surface *hovered_surface;
+	int32_t pointer_surface_x;
+	int32_t pointer_surface_y;
 
 	// The interactive pointer move/resize in progress, if any. Per seat in
 	// principle, but yarfwm drives one operation at a time: a second

@@ -1,9 +1,9 @@
+#include "ChildProcesses.hpp"
 #include "Config.hpp"
 #include "Display.hpp"
 #include "Keybind.hpp"
 #include "river-window-management-v1-client-protocol.h"
 
-#include <csignal>
 #include <cstdio>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -76,6 +76,8 @@ const char *Keybind::action_name(ActionKind kind)
 		return "move_window_to_desktop";
 	case action_move_pointer:
 		return "move_pointer";
+	case action_toggle_decorations:
+		return "toggle_decorations";
 	case action_none:
 	default:
 		return "none";
@@ -115,10 +117,11 @@ static void spawn_command(const std::vector<std::string> &arguments)
 			_exit(0);
 		}
 
-		// Restore the default disposition so the child is not born
-		// ignoring SIGPIPE, which would break the shell pipelines it
-		// spawns in turn.
-		signal(SIGPIPE, SIG_DFL);
+		// The blocked signals are inherited across fork() and preserved
+		// across execve(), so the child would start with its own child
+		// exits silently blocked. Restore the mask before the exec, the
+		// way labwc does in reset_signals_and_limits (spawn.c).
+		ChildProcesses::prepare_child_for_execution();
 
 		std::vector<char *> argument_pointers;
 		argument_pointers.reserve(arguments.size() + 1);
@@ -373,6 +376,11 @@ void Keybind::perform(int definition_index, struct river_seat_v1 *river_seat)
 		}
 		return;
 	}
+	case action_toggle_decorations:
+		view->set_decorations_enabled(!view->decorations_enabled());
+		std::fprintf(stderr, "Yarfwm: toggle_decorations -> %s\n",
+			     view->decorations_enabled() ? "on" : "off");
+		return;
 	case action_none:
 	default:
 		return;

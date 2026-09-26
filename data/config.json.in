@@ -48,6 +48,7 @@
     { "modifiers": ["Super"], "key": "Equal", "action": "set_window_width", "args": ["+10%"] },
     { "modifiers": ["Super", "Shift"], "key": "Minus", "action": "set_window_height", "args": ["-10%"] },
     { "modifiers": ["Super", "Shift"], "key": "Equal", "action": "set_window_height", "args": ["+10%"] },
-    { "modifiers": ["Super", "Shift"], "key": "E", "action": "exit_session" }
+    { "modifiers": ["Super", "Shift"], "key": "E", "action": "exit_session" },
+    { "modifiers": ["Super", "Shift"], "key": "D", "action": "toggle_decorations", "repeat": false }
   ]
 }

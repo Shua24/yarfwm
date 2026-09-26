@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "titlebar_height": 26,
+  "border_width": 1,
+  "button_width": 26,
+  "button_spacing": 0,
+  "padding": 0,
+  "titlebar_when_maximized": true,
+  "font": "JetBrains Mono 10",
+  "titlebar_active_color": "ff203040",
+  "titlebar_inactive_color": "ff404040",
+  "text_active_color": "ffffffff",
+  "text_inactive_color": "ffcccccc",
+  "button_glyph_color": "ffffffff",
+  "border_active_color": "ff5c8fb0",
+  "border_inactive_color": "ff404040"
+}

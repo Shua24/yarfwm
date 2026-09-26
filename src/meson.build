@@ -4,7 +4,10 @@
 yarfwm_core_sources = files(
   'Yarfwm.cpp',
   'Server.cpp',
+  'ChildProcesses.cpp',
+  'SpawnedProcesses.cpp',
   'Display.cpp',
+  'RegistryInterfaces.cpp',
   'Seat.cpp',
   'SeatEvents.cpp',
   'SeatPointer.cpp',
@@ -16,8 +19,15 @@ yarfwm_core_sources = files(
   'ViewWindowState.cpp',
   'ViewMinimize.cpp',
   'ViewDesktops.cpp',
+  'ViewDecoration.cpp',
+  'SeatDecoration.cpp',
   'Placement.cpp',
+  'DecorationGeometry.cpp',
+  'DecorationRenderer.cpp',
+  'Decoration.cpp',
+  'ShmBuffer.cpp',
   'Config.cpp',
+  'WindowDecorationsConfig.cpp',
   'Keybind.cpp',
   'KeybindParse.cpp',
   'KeybindActions.cpp',
@@ -36,6 +46,14 @@ default_config_header = configure_file(
   configuration: {'DEFAULT_CONFIG_JSON': fs.read('../data/config.json.in')},
 )
 
+# The default decorations config is embedded the same way, so first startup
+# can write window-decorations.json with no installed data files.
+default_decorations_config_header = configure_file(
+  input: 'default-decorations-config.h.in',
+  output: 'default-decorations-config.h',
+  configuration: {'DEFAULT_DECORATIONS_CONFIG_JSON': fs.read('../data/window-decorations.json.in')},
+)
+
 executable(
   'yarfwm',
   yarfwm_sources,
@@ -46,12 +64,15 @@ executable(
   river_xkb_bindings_client_header,
   river_xkb_bindings_protocol_source,
   default_config_header,
+  default_decorations_config_header,
   dependencies: [
     wayland_client,
     xkbcommon,
     pixman,
     math,
     jsoncpp,
+    cairo,
+    pangocairo,
   ],
   include_directories: [
     include_directories('../include'),

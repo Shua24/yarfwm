@@ -1,7 +1,7 @@
+#include "ChildProcesses.hpp"
 #include "View.hpp"
 #include "river-window-management-v1-client-protocol.h"
 
-#include <csignal>
 #include <cstdio>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -78,9 +78,9 @@ static void announce_desktop_switch(int desktop_index, int desktop_total,
 			_exit(0);
 		}
 
-		// Same reason as the spawn path: the child must not be born
-		// ignoring SIGPIPE.
-		signal(SIGPIPE, SIG_DFL);
+		// Same reason as the spawn path: the child must not inherit the
+		// blocked signal mask (nor an ignored SIGPIPE).
+		ChildProcesses::prepare_child_for_execution();
 
 		execlp("notify-send", "notify-send", "-a", "yarfwm", "-u",
 		       "low", "-t", "1500", "-h",

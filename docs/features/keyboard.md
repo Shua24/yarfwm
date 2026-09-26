@@ -58,8 +58,8 @@ guard — is therefore yarfwm's to implement and document.
 
 - Directional focus, directional window moves, window state actions (maximize,
   fullscreen, always-on-top, minimize/restore), geometry actions (center, fit,
-  resize by percent), virtual desktop switching, spawn, close and exit_session —
-  30 distinct actions, all implemented.
+  resize by percent), virtual desktop switching, spawn, close, exit_session and
+  the decoration toggle — 31 distinct actions, all implemented.
 - **Minimize follows labwc's Iconify** (2026-09-25): minimizing works on the
   **whole window hierarchy** — a dialog and its toplevel go together, whichever
   one asked, the way labwc minimizes the root and then every sub-view

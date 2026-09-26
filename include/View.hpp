@@ -1,6 +1,8 @@
 #ifndef VIEW_HPP
 #define VIEW_HPP
 
+#include "DecorationGeometry.hpp"
+#include "DecorationSettings.hpp"
 #include "Placement.hpp"
 #include "Server.hpp"
 #include "river-window-management-v1-client-protocol.h"
@@ -10,6 +12,11 @@ class Seat;
 class Config;
 class Output;
 class Keybind;
+class Decoration;
+struct wl_surface;
+// Only ever used through a reference here; the definition lives in
+// WindowDecorationsConfig.hpp, which View.cpp includes.
+struct WindowDecorationsConfig;
 
 // Represents the window management policy and render state.
 class View
@@ -19,7 +26,8 @@ class View
 	~View();
 
 	bool initialize(Server *server, Seat *seat, Display *display,
-			Config &config);
+			Config &config,
+			const WindowDecorationsConfig &decoration_config);
 	void terminate();
 
 	// Set when the server tells us to stop (unavailable/finished). The main
@@ -180,6 +188,63 @@ class View
 	void apply_decoration_hint(struct river_window_v1 *window,
 				   uint32_t hint);
 
+	// Turn decorations on or off. Off destroys every decoration object; on
+	// recreates them lazily on the next render sequence. The request is
+	// recorded and applied by the render pass, so it is safe to call from a
+	// key binding.
+	void set_decorations_enabled(bool enabled);
+	bool decorations_enabled() const { return decorations_on; }
+
+	// The window a titlebar click belongs to, for Seat to start a move on.
+	// Null when the surface belongs to no tracked window.
+	struct river_window_v1 *
+	window_for_decoration_surface(struct wl_surface *surface) const;
+
+	// What part of a window's titlebar a surface-local point falls in. Used
+	// by the Seat's pointer handler to decide between a move and a button.
+	TitlebarPart decoration_part_at(struct river_window_v1 *window,
+					int32_t x, int32_t y) const;
+
+	// One press on our own titlebar arrives TWICE: as a wl_pointer.button
+	// on the decoration surface, and then as a river_seat_v1
+	// window_interaction for the same window. The button handler acts
+	// first and claims the press here; river_seat_window_interaction
+	// consumes the claim and returns early instead of re-queueing focus
+	// for a window the handler may have just minimized or closed -- which
+	// would make a minimized window pop straight back up, because
+	// Seat::record_focus only queues intent and Seat::apply_manage drains
+	// it later.
+	//
+	// Called from Seat::pointer_button when a press lands on a decoration
+	// surface, before acting on the titlebar part.
+	void claim_decoration_click(struct river_window_v1 *window)
+	{
+		decoration_click_claimed = window;
+	}
+
+	// Called from Seat::river_seat_window_interaction. True exactly once
+	// per claimed press.
+	bool consume_decoration_click(struct river_window_v1 *window)
+	{
+		if (decoration_click_claimed == window) {
+			decoration_click_claimed = nullptr;
+			return true;
+		}
+		return false;
+	}
+
+	// Retire a claim that will never be consumed. Called from
+	// Seat::pointer_enter when the pointer enters a surface that is not one
+	// of our decorations -- the only place a stale claim can be dropped
+	// safely, because window_interaction always follows its own press, so
+	// by then any claim has either been consumed or belonged to a press
+	// that produced no interaction at all. Without this, a claim from a
+	// press river ignored would swallow the next genuine content click.
+	void clear_decoration_click_claim()
+	{
+		decoration_click_claimed = nullptr;
+	}
+
 	// How many virtual desktops exist. Public because the wrap helper
 	// needs it and the key binding layer reports it.
 	static int desktop_total();
@@ -199,130 +264,11 @@ class View
 	    void *data, struct river_window_manager_v1 *manager);
 
       private:
-	struct Window {
-		struct river_window_v1 *window;
-		struct river_node_v1 *node;
-		bool managed;
-		// What river believes: true when the last show/hide request
-		// for this window was show(). River considers a new window
-		// shown until told otherwise, so a new entry starts true.
-		// The visibility pass in window_manager_render_start() is
-		// the only writer.
-		bool shown;
-		bool rendered;
-		bool placed;
-		bool close_requested;
-		bool close_sent;
-
-		// Geometry as the window manager last set or heard it: x/y from
-		// the placement pass, width/height from
-		// river_window_v1.dimensions. Directional focus needs both, so
-		// a window that never answered with dimensions is skipped.
-		int32_t x;
-		int32_t y;
-		int32_t width;
-		int32_t height;
-
-		// Where the user put the window. While has_user_geometry is
-		// false the cascade owns the position; once an interactive
-		// move or resize sets it, place_windows() leaves the position
-		// alone instead of re-cascading the window. View::add_window()
-		// zeroes the whole entry with memset before filling it in, so
-		// false is the correct default.
-		bool has_user_geometry;
-		Rectangle user_geometry;
-
-		// The geometry a window had before it was maximized, saved
-		// when maximize turns on so un-maximize can restore it
-		// exactly, the way labwc restores natural_geometry.
-		// has_saved_geometry is false outside a maximize cycle.
-		Rectangle saved_geometry;
-		bool has_saved_geometry;
-
-		// A resize the user asked for, waiting for the next manage
-		// sequence: river_window_v1.propose_dimensions is
-		// manage-sequence-only and a node has no dimension setter, so
-		// the size half of a resize has to go through a proposal.
-		bool propose_pending;
-		Rectangle proposed_geometry;
-
-		// Window state, as the window manager believes it. The
-		// matching protocol requests are manage-sequence-only, so a
-		// change is recorded here and sent by
-		// window_manager_manage_start(); sent_* tracks whether river
-		// has already been told, so a state that does not change does
-		// not re-send.
-		bool maximized;
-		bool maximized_sent;
-		bool fullscreen;
-		bool fullscreen_sent;
-		bool always_on_top;
-		bool always_on_top_sent;
-		// Minimizing hides the window through the visibility pass, like
-		// any other visibility change, so there is no minimized_sent.
-		//
-		// minimize_sequence records when this entry was minimized, so
-		// "restore the most recent one" means the most recent minimize
-		// and not the highest array index. 0 = not minimized by the
-		// action.
-		bool minimized;
-		uint64_t minimize_sequence;
-
-		// A raise is pending: the render pass turns this into one
-		// place_top and clears it. Clicking a window, unminimizing
-		// it, and mapping it all raise it, and place_top is
-		// render-sequence-only in v5, so the request waits for the
-		// next render sequence.
-		bool raise_pending;
-
-		// Stacking order as yarfwm tracks it: the highest z_order
-		// among the visible windows is the topmost one. River has no
-		// stacking query, so this is the window manager's own record,
-		// advanced every time a window is raised or mapped.
-		uint64_t z_order;
-
-		// Which virtual desktop this window belongs to. Desktops are a
-		// window manager invention here, not a protocol feature.
-		int desktop;
-
-		// Window metadata river reports. None of it drives placement
-		// on its own, but all of it is worth keeping: the title and
-		// app_id are what a task list or window menu would show, the
-		// identifier is the stable name river guarantees is unique and
-		// never reused, and the pid is the creator's (explicitly
-		// unreliable, so it must never gate anything security
-		// sensitive).
-		char title[256];
-		char app_id[256];
-		char identifier[64];
-		int unreliable_pid;
-
-		// The window's preferred size bounds, from dimensions_hint.
-		// Zero means "no preference". They are a hint: the XML says
-		// the window manager "is free to propose dimensions outside
-		// of these bounds", but a user resize has no reason to
-		// ignore them.
-		int32_t min_width;
-		int32_t min_height;
-		int32_t max_width;
-		int32_t max_height;
-
-		// The parent window river reported, if any. A dialog should
-		// sit directly above its parent.
-		struct river_window_v1 *parent;
-		// place_above has been sent for this window's parent, so the
-		// request is not repeated every manage sequence.
-		bool parent_placed;
-
-		// Number of active screen capture sessions, from
-		// capture_sessions. River sends it once at creation and again
-		// whenever it changes.
-		uint32_t capture_count;
-
-		// The output a fullscreen window was sent to, or null for "no
-		// preference".
-		struct river_output_v1 *fullscreen_output;
-	};
+	// Forward declaration: the definition is the `struct View::Window` in
+	// ViewWindow.hpp, included at the very end of this file. The class body
+	// below only ever uses Window through a pointer, so an incomplete type
+	// is enough here; the definition must follow the complete class.
+	struct Window;
 
 	// Manager events.
 	static void
@@ -448,6 +394,30 @@ class View
 	void placement_area(int32_t *x, int32_t *y, int32_t *width,
 			    int32_t *height) const;
 
+	// The rectangle windows are actually placed in: the placement area with
+	// the titlebar's strip reserved at its top, so a window put here has
+	// room for its own bar above it and the bar never has to cover the
+	// window. Equal to placement_area() when decorations are off, because
+	// then there is no bar to make room for.
+	//
+	// Every geometry action that fills the area (maximize, fit_to_output,
+	// center) uses this rather than placement_area(), or the window would
+	// end up flush with the area's top edge and its bar would have to go
+	// below it or not be painted at all.
+	void content_area(int32_t *x, int32_t *y, int32_t *width,
+			  int32_t *height) const;
+
+	// The decoration pass: one titlebar per window plus the focus border,
+	// run at the END of the render sequence because it needs the placement
+	// place_windows() just wrote. Defined in src/ViewDecoration.cpp.
+	void apply_decorations(struct river_seat_v1 *river_seat);
+
+	// Destroy a window entry's decoration, if it has one. The single
+	// teardown path for a decoration: terminate(), remove_window() and
+	// the decorations toggle all go through here, so the surface, buffer
+	// and protocol object are released exactly once and in one order.
+	void destroy_decoration(Window *window_entry);
+
 	Seat *seat;
 	Display *display;
 	struct river_window_manager_v1 *manager;
@@ -491,9 +461,28 @@ class View
 	// It starts at 1 so a zero-initialized entry is never "most recent".
 	uint64_t next_minimize_sequence;
 
+	// Decoration appearance, resolved once from window-decorations.json by
+	// View::initialize. Held by value here, but the cairo-using headers
+	// stay in Decoration.hpp: View.hpp only sees the struct's layout.
+	DecorationSettings decoration_settings;
+
+	// Whether decorations are painted at all. Seeded from the config's
+	// "enabled" key and flipped by the toggle_decorations binding.
+	bool decorations_on;
+
+	// The window whose decoration was pressed, waiting for the
+	// window_interaction that press will also produce. See
+	// claim_decoration_click().
+	struct river_window_v1 *decoration_click_claimed;
+
 	// How many virtual desktops exist. River has no desktop concept, so
 	// this is yarfwm's own fixed count.
 	static const int desktop_count = 5;
 };
 
+// View::Window lives in its own header, included at the very END of this file:
+// `struct View::Window` is an out-of-class definition of a nested type, so View
+// must already be complete. Moving this include to the top of the file fails to
+// compile with "error: qualified name does not name a class before '{' token".
+#include "ViewWindow.hpp"
 #endif // VIEW_HPP

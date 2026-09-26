@@ -21,10 +21,10 @@ Two rules drove the pass:
 
 ## The state it produced
 
-- **Actions:** 30 distinct action names in the default config, all implemented,
-  all registered; 46 binds parsed and 46 registered, nothing skipped. The
-  startup line reports it: `Yarfwm: 46 key bindings parsed`,
-  `Yarfwm: registered 46/46 key bindings on a seat`.
+- **Actions:** 31 distinct action names in the default config, all implemented,
+  all registered; 47 binds parsed and 47 registered, nothing skipped. The
+  startup line reports it: `Yarfwm: 47 key bindings parsed`,
+  `Yarfwm: registered 47/47 key bindings on a seat`.
 - **Stubs:** 23 empty handler bodies at the start → **8** now, and each
   remaining one is inert by design (a listener slot that must stay non-NULL, or
   an event with no policy attached). The `pointer_position` handler — the one
@@ -32,11 +32,12 @@ Two rules drove the pass:
   warp (`docs/features/keyboard.md`).
 - **Unused requests, classified:** of the requests the protocol offers, these
   remain uncalled and are documented as such, not hidden: `get_shell_surface`,
-  `set_xcursor_theme`, `get_pointer_binding`, `set_borders`, `set_clip_box`,
+  `set_xcursor_theme`, `get_pointer_binding`, `set_clip_box`,
   `set_content_clip_box`, `set_dimension_bounds`, `set_presentation_mode`,
-  `place_below`, `river_decoration_v1`. Some are candidates for future
-  features (compositor-drawn borders via `set_borders`); some have no consumer
-  under yarfwm's policy.
+  `place_below`. `set_borders` and `river_decoration_v1` were on this list and
+  are **no longer uncalled** — the server-side decorations feature uses both
+  (`docs/features/decorations.md`). Of the rest, some are candidates for future
+  features and some have no consumer under yarfwm's policy.
 - **The config-constraint schema.** The config is now exactly
   `{ "input": { "focus_follows_mouse": false }, "keybinds": [ ...46... ] }` —
   two keys, both consumed. Everything else the inherited config carried

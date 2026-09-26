@@ -85,6 +85,7 @@ class Keybind
 		action_focus_desktop,
 		action_move_window_to_desktop,
 		action_move_pointer,
+		action_toggle_decorations,
 	};
 
 	struct Action {

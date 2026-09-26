@@ -62,6 +62,14 @@ pixman = dependency('pixman-1')
 math = compiler.find_library('m')
 jsoncpp = dependency('jsoncpp', required: false)
 
+# The decoration renderer. cairo paints the titlebar into a shared-memory
+# buffer and pango lays out the title text; both are linked only into the
+# executable and the renderer's test, never into a consumer of Decoration.hpp
+# (the header keeps cairo out, which is why View.hpp can forward declare the
+# Decoration class instead of including it).
+cairo = dependency('cairo')
+pangocairo = dependency('pangocairo')
+
 configuration_data_values = configuration_data()
 configuration_data_values.set10('HAVE_WAYLAND_CURSOR', wayland_cursor.found())
 configuration_data_values.set10('HAVE_JSONCPP', jsoncpp.found())

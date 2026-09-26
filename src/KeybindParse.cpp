@@ -114,6 +114,8 @@ Keybind::Action Keybind::parse_action(const std::string &action_name,
 	} else if (action_name == "move_pointer_down") {
 		action.kind = action_move_pointer;
 		action.direction = focus_direction_down;
+	} else if (action_name == "toggle_decorations") {
+		action.kind = action_toggle_decorations;
 	}
 
 	return action;

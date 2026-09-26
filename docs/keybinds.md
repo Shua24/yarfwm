@@ -36,8 +36,8 @@ Bindings are registered per seat (river scopes a binding to a seat) and only
 A run with the default config logs, at startup:
 
 ```
-Yarfwm: 46 key bindings parsed
-Yarfwm: registered 46/46 key bindings on a seat
+Yarfwm: 47 key bindings parsed
+Yarfwm: registered 47/47 key bindings on a seat
 ```
 
 Every entry in the default config names an implemented action, so nothing is
@@ -107,6 +107,7 @@ window: a taskbar entry cannot restore one (river drops the panel's click — se
 | `set_window_height` | Same for height. |
 | `minimize_window` | Minimize the focused window's whole hierarchy (the window and any dialogs it owns), the way labwc's Iconify does; focus goes to the topmost visible window. Bound to `Super+M`. |
 | `restore_minimized_window` | Bring back the **most recently minimized** hierarchy, raising it to the front and focusing it. If it was minimized on another virtual desktop, that desktop is brought forward so the window is actually visible. Bound to `Super+Shift+M`. |
+| `toggle_decorations` | Turn the window-manager-drawn titlebars and focus borders on or off (`docs/features/decorations.md`). Bound to `Super+Shift+D`. |
 
 `exit_session` is the only action that ends the session, and it is bound to
 `Super+Shift+E` by default. Yarfwm has no action that stops the window manager
@@ -208,7 +209,8 @@ leaves the key free for the client instead of consuming it.
 | `show_hotkey_overlay` | `Super+Slash` | the overlay needs a window-manager-owned renderer; yarfwm has none |
 | `quit` | `Super+E` | stopped the window manager and left river running with no window manager; `exit_session` is the only way to end a session from inside the window manager |
 
-Net effect: 47 inherited binds became 46 — 15 renames in place, 8 deleted, 7
+Net effect: 47 inherited binds became 47 — 15 renames in place, 8 deleted, 8
 added (`Super+Shift+E` for `exit_session` when that action landed, the four
-`move_pointer_*` binds when the keyboard pointer warp landed, and `Super+M` /
-`Super+Shift+M` for minimize and restore when labwc-parity minimize landed).
+`move_pointer_*` binds when the keyboard pointer warp landed, `Super+M` /
+`Super+Shift+M` for minimize and restore when labwc-parity minimize landed, and
+`Super+Shift+D` for `toggle_decorations` when server-side decorations landed).

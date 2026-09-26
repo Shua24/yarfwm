@@ -1,9 +1,11 @@
 #include "View.hpp"
 #include "Config.hpp"
+#include "Decoration.hpp"
 #include "Display.hpp"
 #include "Keybind.hpp"
 #include "Output.hpp"
 #include "Seat.hpp"
+#include "WindowDecorationsConfig.hpp"
 #include "river-window-management-v1-client-protocol.h"
 #include <cstdio>
 #include <cstdlib>
@@ -34,20 +36,28 @@ View::View()
       output_capacity(0), default_layer_output(nullptr),
       pending_manage_count(0), pending_render_count(0),
       shutdown_requested(false), manage_requested(false), keybind(nullptr),
-      session_locked(false), active_desktop(0), next_z_order(1)
+      session_locked(false), active_desktop(0), next_z_order(1),
+      decorations_on(false), decoration_click_claimed(nullptr)
 {
 }
 
 View::~View() { terminate(); }
 
 bool View::initialize(Server *server, Seat *seat, Display *display,
-		      Config &config)
+		      Config &config,
+		      const WindowDecorationsConfig &decoration_config)
 {
 	// Dynamic memory: window and output tracking arrays grow on demand.
 	(void)server;
 	(void)config;
 	this->seat = seat;
 	this->display = display;
+
+	// The decoration appearance is read exactly once, here. Everything the
+	// renderer needs is resolved into decoration_settings now, so the
+	// render pass never touches the settings file.
+	decoration_settings_from(decoration_config, &decoration_settings);
+	decorations_on = decoration_config.enabled;
 
 	if (!display->window_manager) {
 		std::fprintf(stderr,
@@ -81,6 +91,7 @@ void View::terminate()
 	// Dynamic memory: free tracked windows and outputs.
 	for (int i = 0; i < window_count; i++) {
 		Window *window_entry = &windows[i];
+		destroy_decoration(window_entry);
 		if (window_entry->node) {
 			river_node_v1_destroy(window_entry->node);
 			window_entry->node = nullptr;
@@ -271,6 +282,9 @@ void View::remove_window(struct river_window_v1 *window)
 {
 	for (int i = 0; i < window_count; i++) {
 		if (windows[i].window == window) {
+			// Before the swap-delete: after the swap this
+			// entry's pointer would be a different window's.
+			destroy_decoration(&windows[i]);
 			if (windows[i].node) {
 				river_node_v1_destroy(windows[i].node);
 				windows[i].node = nullptr;
@@ -404,7 +418,8 @@ void View::propose_default_dimensions(Window *window) const
 	int32_t area_y = 0;
 	int32_t area_width = 0;
 	int32_t area_height = 0;
-	placement_area(&area_x, &area_y, &area_width, &area_height);
+	// The reserved area: a default-sized window must fit under its bar.
+	content_area(&area_x, &area_y, &area_width, &area_height);
 	(void)area_x;
 	(void)area_y;
 
@@ -421,11 +436,14 @@ void View::propose_default_dimensions(Window *window) const
 
 void View::place_windows()
 {
+	// The reserved area, not the raw one: the cascade starts at the area
+	// origin, and the raw origin leaves the window flush with the top of
+	// the output, where its titlebar has no room above it.
 	int32_t area_x = 0;
 	int32_t area_y = 0;
 	int32_t area_width = 0;
 	int32_t area_height = 0;
-	placement_area(&area_x, &area_y, &area_width, &area_height);
+	content_area(&area_x, &area_y, &area_width, &area_height);
 	const Rectangle area{area_x, area_y, area_width, area_height};
 
 	int x = area_x;
@@ -454,7 +472,7 @@ void View::place_windows()
 			continue;
 		}
 
-		// Cascade floating placement, wrapping inside the placement
+		// Cascade floating placement, wrapping inside the reserved
 		// area. The step and the wrap are the tested arithmetic in
 		// src/Placement.cpp. The window is placed at the current
 		// position and the cascade advances afterwards, which is the

@@ -122,7 +122,7 @@ void View::toggle_maximize(struct river_window_v1 *window)
 		// maximized window, so this is a position and a proposal like
 		// any other.
 		Rectangle area{0, 0, 0, 0};
-		placement_area(&area.x, &area.y, &area.width, &area.height);
+		content_area(&area.x, &area.y, &area.width, &area.height);
 		set_user_geometry(window, area);
 		propose_user_dimensions(window, area);
 	} else if (window_entry->has_saved_geometry) {
@@ -136,7 +136,7 @@ void View::toggle_maximize(struct river_window_v1 *window)
 		// window): fall back to half the placement area. The window
 		// keeps where it was put.
 		Rectangle area{0, 0, 0, 0};
-		placement_area(&area.x, &area.y, &area.width, &area.height);
+		content_area(&area.x, &area.y, &area.width, &area.height);
 		Rectangle restored =
 		    window_entry->has_user_geometry
 			? window_entry->user_geometry
@@ -198,7 +198,7 @@ void View::set_fullscreen(struct river_window_v1 *window, bool fullscreen,
 		// size here and let the render sequence that follows place
 		// it, rather than leaving the window unplaced.
 		Rectangle area{0, 0, 0, 0};
-		placement_area(&area.x, &area.y, &area.width, &area.height);
+		content_area(&area.x, &area.y, &area.width, &area.height);
 		Rectangle restored =
 		    window_entry->has_user_geometry
 			? window_entry->user_geometry
@@ -243,7 +243,7 @@ void View::center_window(struct river_window_v1 *window)
 	}
 
 	Rectangle area{0, 0, 0, 0};
-	placement_area(&area.x, &area.y, &area.width, &area.height);
+	content_area(&area.x, &area.y, &area.width, &area.height);
 
 	// Keep the current size; only the position changes. The size comes
 	// from the tracked geometry, which the dimensions event keeps current.
@@ -262,7 +262,7 @@ void View::center_window(struct river_window_v1 *window)
 void View::center_all_windows()
 {
 	Rectangle area{0, 0, 0, 0};
-	placement_area(&area.x, &area.y, &area.width, &area.height);
+	content_area(&area.x, &area.y, &area.width, &area.height);
 
 	int centred = 0;
 	for (int i = 0; i < window_count; i++) {
@@ -295,7 +295,7 @@ void View::fit_to_output(struct river_window_v1 *window)
 	// The placement area rather than the raw output: fitting a window to
 	// the full output would put it underneath the bars and docks.
 	Rectangle area{0, 0, 0, 0};
-	placement_area(&area.x, &area.y, &area.width, &area.height);
+	content_area(&area.x, &area.y, &area.width, &area.height);
 	std::fprintf(stderr, "Yarfwm: fit_to_output -> %dx%d\n", area.width,
 		     area.height);
 	set_user_geometry(window, area);
@@ -363,17 +363,26 @@ void View::resize_window(struct river_window_v1 *window, bool resize_width,
 
 void View::apply_decoration_hint(struct river_window_v1 *window, uint32_t hint)
 {
-	if (!find_window(window)) {
+	Window *window_entry = find_window(window);
+	if (!window_entry) {
 		return;
 	}
 
-	// Nothing is sent back, on purpose. River's default when the window
-	// manager sends neither use_csd nor use_ssd is client-side
-	// decorations, so windows that want CSD already get it; honouring a
-	// server-side hint would mean drawing the decoration here, and
-	// yarfwm has no renderer. The XML allows the hint to be re-sent
-	// whenever the window changes its preferences, so every event is
-	// logged rather than only the first.
+	// The hint is stored, not answered here: use_ssd/use_csd are
+	// manage-sequence-only requests and are sent from
+	// window_manager_manage_start(), which is also where the once-guard
+	// lives. The XML allows the hint to be re-sent whenever the window
+	// changes its preferences, so a changed hint clears the guard and the
+	// request goes out again.
+	//
+	// A CSD-only client is never sent use_ssd (the XML documents the
+	// request as having no effect there) and never gets a titlebar drawn
+	// over its own.
+	if (window_entry->decoration_hint != hint) {
+		window_entry->decoration_hint = hint;
+		window_entry->ssd_requested = false;
+		request_manage();
+	}
 	switch (hint) {
 	case RIVER_WINDOW_V1_DECORATION_HINT_ONLY_SUPPORTS_CSD:
 	case RIVER_WINDOW_V1_DECORATION_HINT_PREFERS_CSD:

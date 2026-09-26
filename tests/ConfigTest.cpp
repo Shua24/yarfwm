@@ -155,7 +155,8 @@ TEST_F(ConfigTest, MissingFileWritesTheEmbeddedDefault)
 	Config written;
 	ASSERT_TRUE(written.load(default_config_path()));
 	ASSERT_TRUE(written.keybinds.isArray());
-	EXPECT_EQ(written.keybinds.size(), 46U);
+	// 47 since toggle_decorations (Super+Shift+D) joined the default set.
+	EXPECT_EQ(written.keybinds.size(), 47U);
 	// The embedded default is click-to-focus now, the labwc default.
 	EXPECT_FALSE(written.input.get("focus_follows_mouse", false).asBool());
 }
@@ -167,7 +168,8 @@ TEST_F(ConfigTest, MalformedFileFallsBackToTheDefault)
 	Config config;
 	ASSERT_TRUE(config.load(path));
 	ASSERT_TRUE(config.keybinds.isArray());
-	EXPECT_EQ(config.keybinds.size(), 46U);
+	// 47: the embedded default, including toggle_decorations.
+	EXPECT_EQ(config.keybinds.size(), 47U);
 }
 
 } // namespace

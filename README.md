@@ -25,7 +25,7 @@ Pre-1.0, under active development. Verified live on 2026-09-23 against river
   (verified with `foot`)
 - Supports layer shell: wallpaper clients and bars map correctly, including
   exclusive-zone tracking (verified with `swaybg`, `wbg` and `waybar`)
-- Keyboard bindings: all 46 binds in the default config register per seat
+- Keyboard bindings: all 47 binds in the default config register per seat
   (nothing is skipped), and spawn / close / directional focus / focus-previous /
   exit-session fires on injected key events (verified with `wtype`; see
   `docs/keybinds.md`)
@@ -167,10 +167,21 @@ Yarfwm, and it is what a normal login does.
 Start Yarfwm from the river init script, or by running `river -c yarfwm` from a
 tty when you deliberately want to skip the init script.
 
-The configuration file lives at `$HOME/.config/yarfwm/config.json`. It is
-written from a default embedded in the binary on first startup, and never
-overwritten afterwards. Lookup order: `./config.json` in the working directory,
-then `$HOME/.config/yarfwm/config.json`.
+Yarfwm reads **two** configuration files, both written from a default embedded
+in the binary on first startup and never overwritten afterwards:
+
+| file | holds | read by |
+|---|---|---|
+| `$HOME/.config/yarfwm/config.json` | window-management behaviour: `input.focus_follows_mouse` and the `keybinds` array | `Config` → `Seat`, `Keybind` |
+| `$HOME/.config/yarfwm/window-decorations.json` | how server-side decorations are painted: titlebar height, border width, button metrics, font, colours | `WindowDecorations` → the decoration renderer |
+
+They are deliberately separate. A typo in a colour must not be able to break
+your keybindings, and a bad keybind must not be able to make a titlebar
+unreadable. Each file's lookup order is the file in the working directory, then
+the one under `$HOME/.config/yarfwm/`.
+
+Neither file is ever rewritten once it exists, so your edits always survive an
+upgrade. Delete one to get the default back.
 
 ## Repository layout
 
@@ -181,8 +192,8 @@ river-window-management-v1.xml    core protocol definition — the single source
 protocols/                        layer-shell + xkb-bindings protocol XMLs and their build rules
 src/                              implementation
 include/                          headers (mirrors src/)
-data/                             icon and default config (config.json.in)
-docs/                             developer notes (keybindings)
+data/                             icon and default configs (config.json.in, window-decorations.json.in)
+docs/                             developer notes (keybindings, per-feature notes)
 .clang-format                     the code style, applied with clang-format -i
 build/                            meson output directory — generated, never edit, never commit
 ```
@@ -282,12 +293,17 @@ ninja -C build
 meson test -C build
 ```
 
-Five suites run without a Wayland connection: `placement` and
+Nine suites run without a Wayland connection: `placement` and
 `placement_helpers` (cascade step, directional scoring, desktop wrap,
 dimension-hint clamping), `config` (parsing, removed-key tolerance, the
 first-start default write), `keybind_parse` (keysym folding, modifier masks,
-action names) and `view_lock` (the session lock guard). Everything else is
-verified with the headless recipe above.
+action names), `view_lock` (the session lock guard), `display_registry` (the
+registry globals the decoration renderer needs, and that nothing extra is
+bound), `decoration_geometry` (button layout, pruning, text band, hit testing,
+offsets), `decoration_renderer` (buffer painting and colour scaling) and
+`window_decorations_config` (colour parsing, fallbacks, the generated file,
+partial and malformed input). Everything else is verified with the headless
+recipe above.
 
 ### Adding a protocol
 
@@ -297,6 +313,40 @@ verified with the headless recipe above.
 3. List both targets in the `executable()` sources in `src/meson.build`.
 
 Never check in generated protocol files.
+
+### Adding a configuration file
+
+Settings live in the file that owns their concern, not in one growing config.
+A new feature gets its own `data/<name>.json.in` and its own reader;
+`window-decorations.json` is the worked example to copy:
+
+1. `data/<name>.json.in` — the default values. This text is what gets written to
+   `$HOME/.config/yarfwm/<name>.json` on first startup.
+2. `src/default-<name>.h.in` — a raw-string holder for that text. Keep the
+   delimiter under 16 characters (C++'s limit) and make it distinct from the
+   others, so a grep for one header never matches another.
+3. `include/<Name>Config.hpp` and `src/<Name>Config.cpp` — the reader. Give
+   **every** key a hard-coded fallback and never fail the caller: a broken
+   settings file must not stop the window manager. Keep jsoncpp out of the
+   header so consumers do not inherit it.
+4. `src/meson.build` — add the `.cpp` to `yarfwm_core_sources`, add a
+   `configure_file` for the header, and list that header in `executable(...)`.
+5. `tests/meson.build` — a suite for the reader, including a check that the
+   embedded default and the hard-coded fallbacks agree (if they drift, a fresh
+   user and an existing one get different behaviour).
+
+To verify generation from a clean slate, run with a throwaway `HOME` **from a
+directory containing no copy of the file** — a stray `./<name>.json` shadows the
+user config and suppresses the write, which looks exactly like a broken
+generator:
+
+````
+mkdir -p /tmp/yarfwm-cfg && cd /tmp/yarfwm-cfg
+HOME=/tmp/yarfwm-cfg/home ./build/src/yarfwm
+cat /tmp/yarfwm-cfg/home/.config/yarfwm/<name>.json
+````
+
+Then edit a value, run again, and confirm the edit survives.
 
 ## Contributing
 
