@@ -102,27 +102,52 @@ static void apply(const Json::Value &root, WindowDecorationsConfig &values)
 	if (root.isMember("font")) {
 		values.font = root["font"].asString();
 	}
+	// Each colour is read into a named text value first: the config key,
+	// the JSON lookup and the parse are three separate steps so a reader
+	// can follow them without counting parentheses.
+	const Json::Value titlebar_active_value =
+	    root.get("titlebar_active_color", "");
+	const std::string titlebar_active_text =
+	    titlebar_active_value.asString();
 	values.titlebar_active_color = parse_decoration_color(
-	    root.get("titlebar_active_color", "").asString(),
-	    values.titlebar_active_color);
+	    titlebar_active_text, values.titlebar_active_color);
+
+	const Json::Value titlebar_inactive_value =
+	    root.get("titlebar_inactive_color", "");
+	const std::string titlebar_inactive_text =
+	    titlebar_inactive_value.asString();
 	values.titlebar_inactive_color = parse_decoration_color(
-	    root.get("titlebar_inactive_color", "").asString(),
-	    values.titlebar_inactive_color);
+	    titlebar_inactive_text, values.titlebar_inactive_color);
+
+	const Json::Value text_active_value = root.get("text_active_color", "");
+	const std::string text_active_text = text_active_value.asString();
 	values.text_active_color =
-	    parse_decoration_color(root.get("text_active_color", "").asString(),
-				   values.text_active_color);
+	    parse_decoration_color(text_active_text, values.text_active_color);
+
+	const Json::Value text_inactive_value =
+	    root.get("text_inactive_color", "");
+	const std::string text_inactive_text = text_inactive_value.asString();
 	values.text_inactive_color = parse_decoration_color(
-	    root.get("text_inactive_color", "").asString(),
-	    values.text_inactive_color);
+	    text_inactive_text, values.text_inactive_color);
+
+	const Json::Value button_glyph_value =
+	    root.get("button_glyph_color", "");
+	const std::string button_glyph_text = button_glyph_value.asString();
 	values.button_glyph_color = parse_decoration_color(
-	    root.get("button_glyph_color", "").asString(),
-	    values.button_glyph_color);
+	    button_glyph_text, values.button_glyph_color);
+
+	const Json::Value border_active_value =
+	    root.get("border_active_color", "");
+	const std::string border_active_text = border_active_value.asString();
 	values.border_active_color = parse_decoration_color(
-	    root.get("border_active_color", "").asString(),
-	    values.border_active_color);
+	    border_active_text, values.border_active_color);
+
+	const Json::Value border_inactive_value =
+	    root.get("border_inactive_color", "");
+	const std::string border_inactive_text =
+	    border_inactive_value.asString();
 	values.border_inactive_color = parse_decoration_color(
-	    root.get("border_inactive_color", "").asString(),
-	    values.border_inactive_color);
+	    border_inactive_text, values.border_inactive_color);
 }
 
 WindowDecorations::WindowDecorations() : values(default_values()) {}

@@ -129,8 +129,9 @@ static void spawn_command(const std::vector<std::string> &arguments)
 		// dereference returns by value under this standard library,
 		// which trips -Waggregate-return.
 		for (std::size_t index = 0; index < arguments.size(); index++) {
-			argument_pointers.push_back(
-			    const_cast<char *>(arguments[index].c_str()));
+			char *argument_pointer =
+			    const_cast<char *>(arguments[index].c_str());
+			argument_pointers.push_back(argument_pointer);
 		}
 		argument_pointers.push_back(nullptr);
 

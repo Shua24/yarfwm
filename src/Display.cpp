@@ -118,13 +118,15 @@ static void registry_handle_global(void *data, struct wl_registry *registry,
 	Display *display = static_cast<Display *>(data);
 
 	switch (classify_registry_interface(interface)) {
-	case registry_interface_window_manager:
+	case registry_interface_window_manager: {
+		void *window_manager_global = wl_registry_bind(
+		    registry, name, &river_window_manager_v1_interface,
+		    std::min<uint32_t>(version, 6));
 		display->window_manager =
 		    static_cast<struct river_window_manager_v1 *>(
-			wl_registry_bind(registry, name,
-					 &river_window_manager_v1_interface,
-					 std::min<uint32_t>(version, 6)));
+			window_manager_global);
 		break;
+	}
 	case registry_interface_layer_shell:
 		// Binding this global is how the window manager tells river it
 		// supports layer shell; without it river refuses to map layer
@@ -132,33 +134,38 @@ static void registry_handle_global(void *data, struct wl_registry *registry,
 		display->layer_shell_state.bind_registry_global(registry, name,
 								version);
 		break;
-	case registry_interface_xkb_bindings:
+	case registry_interface_xkb_bindings: {
 		// The keyboard binding factory. River only advertises it next
 		// to the window management global; version 3 is what river
 		// 0.4.8 speaks.
+		void *xkb_bindings_global = wl_registry_bind(
+		    registry, name, &river_xkb_bindings_v1_interface,
+		    std::min<uint32_t>(version, 3));
 		display->xkb_bindings =
 		    static_cast<struct river_xkb_bindings_v1 *>(
-			wl_registry_bind(registry, name,
-					 &river_xkb_bindings_v1_interface,
-					 std::min<uint32_t>(version, 3)));
+			xkb_bindings_global);
 		break;
-	case registry_interface_compositor:
+	}
+	case registry_interface_compositor: {
 		// wl_compositor: needed to create the decoration surfaces. The
 		// window manager creates surfaces and never renders them
 		// through the compositor's GL path; a wl_shm buffer is the only
 		// backing store used, which is why version 4 (the minimum that
 		// can create a surface and a region) is enough.
-		display->compositor = static_cast<struct wl_compositor *>(
+		void *compositor_global =
 		    wl_registry_bind(registry, name, &wl_compositor_interface,
-				     std::min<uint32_t>(version, 4)));
+				     std::min<uint32_t>(version, 4));
+		display->compositor =
+		    static_cast<struct wl_compositor *>(compositor_global);
 		break;
+	}
 	case registry_interface_shared_memory:
 		// wl_shm: the buffer backing store for the titlebar. Version 1
 		// is the whole API surface used here (create_pool + format).
 		display->shared_memory = static_cast<struct wl_shm *>(
 		    wl_registry_bind(registry, name, &wl_shm_interface, 1));
 		break;
-	case registry_interface_seat:
+	case registry_interface_seat: {
 		// wl_seat: bound for the titlebar click channel only. River
 		// routes a press on a window to window_interaction, but a press
 		// on a decoration surface has no scene node for river to
@@ -169,11 +176,14 @@ static void registry_handle_global(void *data, struct wl_registry *registry,
 		// The version is taken from the advertisement: binding a
 		// higher version than the compositor offers is a protocol
 		// error, and the pointer's own version follows its parent.
-		display->remember_seat(
-		    name, static_cast<struct wl_seat *>(wl_registry_bind(
-			      registry, name, &wl_seat_interface,
-			      std::min<uint32_t>(version, 9))));
+		void *seat_global =
+		    wl_registry_bind(registry, name, &wl_seat_interface,
+				     std::min<uint32_t>(version, 9));
+		struct wl_seat *bound_seat =
+		    static_cast<struct wl_seat *>(seat_global);
+		display->remember_seat(name, bound_seat);
 		break;
+	}
 	case registry_interface_unknown:
 	default:
 		// Every other global is deliberately ignored.

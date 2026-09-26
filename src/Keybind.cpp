@@ -54,9 +54,10 @@ bool Keybind::initialize(Server *server, Display *display, Seat *seat,
 	// reconcile registered + skipped against the config's entry count.
 	int skipped_entry_count = 0;
 	for (const Json::Value &bind : config.keybinds) {
-		const std::string action_name =
-		    bind.get("action", "").asString();
-		const std::string key_name = bind.get("key", "").asString();
+		const Json::Value action_value = bind.get("action", "");
+		const std::string action_name = action_value.asString();
+		const Json::Value key_value = bind.get("key", "");
+		const std::string key_name = key_value.asString();
 
 		// The args array is read before parsing: the resize actions
 		// carry their percentage in it.

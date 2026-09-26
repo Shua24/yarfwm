@@ -29,10 +29,11 @@ class WindowDecorationsTest : public ::testing::Test
 		had_home = home != nullptr;
 		saved_home = home ? home : "";
 
+		const std::string scratch_name = "yarfwm-decorations-test-" +
+						 std::to_string(::getpid()) +
+						 "-" + std::to_string(counter);
 		const std::filesystem::path base =
-		    std::filesystem::temp_directory_path() /
-		    ("yarfwm-decorations-test-" + std::to_string(::getpid()) +
-		     "-" + std::to_string(counter));
+		    std::filesystem::temp_directory_path() / scratch_name;
 		counter++;
 		std::filesystem::create_directories(base);
 		scratch = base.string();
@@ -155,8 +156,9 @@ TEST_F(WindowDecorationsTest, AnExistingFileIsNeverOverwritten)
 	WindowDecorations second;
 	second.load(path);
 	std::ifstream file(path);
-	std::string contents((std::istreambuf_iterator<char>(file)),
-			     std::istreambuf_iterator<char>());
+	std::istreambuf_iterator<char> file_begin(file);
+	std::istreambuf_iterator<char> file_end;
+	std::string contents(file_begin, file_end);
 	EXPECT_NE(contents.find("40"), std::string::npos);
 	EXPECT_EQ(second.settings().titlebar_height, 40);
 }

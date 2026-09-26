@@ -37,8 +37,9 @@ bool Seat::initialize(Server *server, Display *display, Config &config)
 	// forwards them here.
 	display->seat_owner = this;
 
-	focus_follows_mouse =
-	    config.input.get("focus_follows_mouse", false).asBool();
+	const Json::Value focus_follows_mouse_value =
+	    config.input.get("focus_follows_mouse", false);
+	focus_follows_mouse = focus_follows_mouse_value.asBool();
 	return true;
 }
 

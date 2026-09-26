@@ -195,9 +195,10 @@ void View::add_window(struct river_window_v1 *window)
 	if (window_count >= window_capacity) {
 		int new_capacity =
 		    window_capacity == 0 ? 8 : window_capacity * 2;
-		Window *new_windows = static_cast<Window *>(std::realloc(
-		    windows,
-		    sizeof(Window) * static_cast<size_t>(new_capacity)));
+		size_t new_size =
+		    sizeof(Window) * static_cast<size_t>(new_capacity);
+		Window *new_windows =
+		    static_cast<Window *>(std::realloc(windows, new_size));
 		if (!new_windows) {
 			std::fprintf(
 			    stderr,
@@ -318,9 +319,10 @@ void View::add_output(struct river_output_v1 *output)
 	if (output_count >= output_capacity) {
 		int new_capacity =
 		    output_capacity == 0 ? 4 : output_capacity * 2;
-		Output **new_outputs = static_cast<Output **>(std::realloc(
-		    outputs,
-		    sizeof(Output *) * static_cast<size_t>(new_capacity)));
+		size_t new_size =
+		    sizeof(Output *) * static_cast<size_t>(new_capacity);
+		Output **new_outputs =
+		    static_cast<Output **>(std::realloc(outputs, new_size));
 		if (!new_outputs) {
 			std::fprintf(
 			    stderr,
