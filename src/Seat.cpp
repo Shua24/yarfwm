@@ -26,17 +26,17 @@ Seat::Seat()
 
 Seat::~Seat() { terminate(); }
 
-bool Seat::initialize(Server *server, Display *display, Config &config)
+bool Seat::initialize(Server *server, Display *display_state, Config &config)
 {
 	// Dynamic memory: none yet; per-seat state is created lazily in
 	// attach_river_seat() when river hands the window manager a seat.
 	(void)server;
-	this->display = display;
+	this->display = display_state;
 
 	// The seat owns the wl_pointer bindings; Display receives the
 	// capability events (they are a property of the wl_seat object) and
 	// forwards them here.
-	display->seat_owner = this;
+	display_state->seat_owner = this;
 
 	const Json::Value focus_follows_mouse_value =
 	    config.input.get("focus_follows_mouse", false);
@@ -45,9 +45,9 @@ bool Seat::initialize(Server *server, Display *display, Config &config)
 }
 
 void Seat::attach_river_seat(struct river_seat_v1 *river_seat,
-			     LayerShell &layer_shell, View *view)
+			     LayerShell &layer_shell, View *view_state)
 {
-	this->view = view;
+	this->view = view_state;
 
 	if (!river_seat) {
 		return;

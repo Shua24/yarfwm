@@ -44,10 +44,17 @@ add_project_arguments(compiler.get_supported_arguments([
   '-Wnull-dereference',
   '-Wmisleading-indentation',
   '-Wduplicated-cond',
-  '-Wduplicated-branches',
+  # -Wduplicated-branches is deliberately NOT enabled: GCC 16.2.1 emits it as a
+  # false positive for `new (std::nothrow) T[n]`, claiming "this condition has
+  # identical branches" for a line with no condition at all. Removing
+  # std::nothrow silences it but breaks the null check the next line depends on,
+  # so the flag would force a choice between a real bug and a warning. See the
+  # README's CI section for the minimal reproduction.
+  # -Waggregate-return is deliberately NOT enabled: it was 229 of this
+  # project's warnings and the codebase already carries several workarounds for
+  # it. It is a style preference, not a defect signal.
   '-Wlogical-op',
   '-Wrestrict',
-  '-Waggregate-return',
   '-Walloc-zero',
   '-Wvla',
   '-Wno-unused-parameter',

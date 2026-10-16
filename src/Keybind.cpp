@@ -25,15 +25,15 @@ Keybind::Keybind()
 
 Keybind::~Keybind() { terminate(); }
 
-bool Keybind::initialize(Server *server, Display *display, Seat *seat,
-			 View *view, Config &config)
+bool Keybind::initialize(Server *server_state, Display *display_state,
+			 Seat *seat_state, View *view_state, Config &config)
 {
-	this->server = server;
-	this->display = display;
-	this->seat = seat;
-	this->view = view;
+	this->server = server_state;
+	this->display = display_state;
+	this->seat = seat_state;
+	this->view = view_state;
 
-	if (!display || !display->xkb_bindings) {
+	if (!display_state || !display_state->xkb_bindings) {
 		// Not fatal: river without the bindings global leaves the
 		// window manager usable, just without key bindings.
 		std::fprintf(stderr, "Yarfwm: no river_xkb_bindings_v1 "
@@ -130,7 +130,7 @@ bool Keybind::initialize(Server *server, Display *display, Seat *seat,
 	// The manage sequence handler lives in View, so it needs a way back
 	// here to enable the bindings it creates.
 	if (!definitions.empty()) {
-		view->set_keybind(this);
+		view_state->set_keybind(this);
 	}
 
 	// Key repeat is driven by our own timer; without it the bindings stay

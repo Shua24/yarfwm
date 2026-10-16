@@ -14,7 +14,10 @@ static const int32_t move_step = 32;
 // sequence, so the state is recorded here and applied by
 // window_manager_manage_start().
 
-void View::set_keybind(Keybind *keybind) { this->keybind = keybind; }
+void View::set_keybind(Keybind *keybind_state)
+{
+	this->keybind = keybind_state;
+}
 
 int View::desktop_total() { return View::desktop_count; }
 

@@ -1,5 +1,7 @@
 # Yarfwm — Yet Another River Floating Window Manager
 
+[![CI](https://github.com/Shua24/yarfwm/actions/workflows/ci.yml/badge.svg)](https://github.com/Shua24/yarfwm/actions/workflows/ci.yml)
+
 A floating window manager for the [river](https://codeberg.org/river/river) Wayland
 compositor, written in C++17.
 
@@ -17,10 +19,14 @@ reference for developers writing their own river window manager.
 
 ## Status
 
-Pre-1.0, under active development. Verified live on 2026-09-23 against river
-0.4.8 in a headless session:
+Pre-1.0, under active development. Each item below was verified live in a
+headless river session; the cursor and seat-operation entries were verified
+against **river 0.5.0**, the rest against earlier river releases and are
+unaffected by the upgrade:
 
-- Builds clean from a fresh checkout (`meson setup build && ninja -C build` → exit 0)
+- Builds clean from a fresh checkout (`meson setup build && ninja -C build` →
+  exit 0), with **zero warnings from this project's own sources** — a claim the
+  CI pipeline enforces, see below
 - Manages windows: proposes sizes, tracks configures, maps and releases windows
   (verified with `foot`)
 - Supports layer shell: wallpaper clients and bars map correctly, including
@@ -49,20 +55,66 @@ Pre-1.0, under active development. Verified live on 2026-09-23 against river
   strands the keyboard: the recorded fallback survives the lock and is applied
   when the overlay lets go (before the fix: no focus request at all, verified
   with a control)
+- A window destroyed **while it is being dragged or resized** no longer leaks
+  the in-flight operation: the seat drops the dead window and ends the operation
+  in the next manage sequence, so river stops sending deltas and the next drag
+  works normally (verified with a synthetic client that presses the titlebar,
+  drags, destroys the window mid-gesture, then drags a second window)
+- Cursor: an interactive move shows the grab hand and a resize shows the arrow
+  for the edge being pulled, returning to the default on release — the window
+  manager's own cursor, set through `wp_cursor_shape_manager_v1`
+  (`river_seat_v1`'s version-4 note says that cursor is the window manager's
+  while no client has pointer focus). Verified by the request going out with a
+  valid shape value on a real cursor device, set on grab and handed back on
+  release; headless has no cursor to look at, so this is request-level rather
+  than visual confirmation
+- Server-side decorations: yarfwm draws its own titlebar (title text plus
+  minimize / maximize / close buttons) and a focus border, and asks river for
+  server-side decorations (`use_ssd`, `set_borders`,
+  `river_decoration_v1` via `get_decoration_above`). See
+  `docs/features/decorations.md`
 - Exits cleanly when river shuts down (exit code 0, no crash)
+
+### Known limitations
+
+**Minimizing a window and restoring it both require keybinds.**
+
+- **Minimize** — `Super+M` minimizes the focused window's whole hierarchy (the
+  window plus any dialogs it owns), the way labwc's Iconify does. There is also
+  a minimize button in the titlebar, so a window you can already see and click
+  does not strictly need the binding.
+- **Restore** — `Super+Shift+M` brings back the most recently minimized
+  hierarchy, raising it, focusing it, and pulling forward its virtual desktop if
+  it was minimized elsewhere. **This is the only way back**, and that is a river
+  limitation rather than a missing feature.
+
+A taskbar or panel entry **cannot** restore a minimized window. The panel sends
+`zwlr_foreign_toplevel_handle_v1.activate`; river subscribes to no listener for
+it, and the window-management protocol has no `activate`/`unminimize` event that
+could carry the request. The click is dropped inside river, so no amount of
+window-manager work can recover it. Reproduced with `xfce4-panel` and `sfwbar`;
+accepted and documented in `docs/features/panel-taskbar.md`.
+
+So if you minimize a window whose titlebar you can no longer reach — or one you
+minimized from another desktop — **the keyboard is the way back**:
+`Super+Shift+M`.
 
 Not implemented yet:
 
-- Window decorations — yarfwm draws none and asks for none: river's default
-  (client-side decorations) applies, and honoring a server-side decoration hint
-  would mean drawing the decoration, which needs a renderer yarfwm does not
-  have. Compositor-drawn borders (`set_borders`) are a candidate for a later
-  batch.
-- Panel/taskbar integration — a taskbar entry cannot restore a minimized
-  window: the click is dropped by river itself (no window-manager hook exists),
-  and the virtual desktops cannot be shown in a panel. Accepted and documented
-  in `docs/features/panel-taskbar.md`; restore works through the
-  `restore_minimized_window` binding.
+- Panel/taskbar integration — beyond the restore limitation above, the virtual
+  desktops cannot be shown in a panel either. Accepted and documented in
+  `docs/features/panel-taskbar.md`.
+- Full protocol coverage — of the requests `river-window-management-v1` offers,
+  these remain deliberately uncalled and are documented rather than hidden:
+  `get_shell_surface` and the whole `river_shell_surface_v1` interface (the
+  window-manager-owns-UI path: a bar, launcher or overlay would need a renderer
+  yarfwm does not have), `river_pointer_binding_v1` (pointer-button bindings),
+  `set_tiled` (a floating window manager has no tiled layout),
+  `set_clip_box` / `set_content_clip_box` (only meaningful with a scrollable
+  layout), `get_decoration_below` (decorations are drawn above),
+  `place_below`, `set_dimension_bounds`, `set_presentation_mode`,
+  `set_xcursor_theme` and `focus_shell_surface`. See
+  `docs/features/protocol-completion.md`.
 
 ## Requirements
 
@@ -72,23 +124,39 @@ Not implemented yet:
 | ninja | — | |
 | C++17 compiler | — | built with `warning_level=2` plus ~30 extra warning flags |
 | wayland-client | 1.22.90 | also provides `wayland-scanner`, used at build time |
-| wayland-cursor | — | optional, detected at configure time |
 | xkbcommon | — | |
 | pixman-1 | — | |
-| jsoncpp | — | required in practice — see the note below |
+| jsoncpp | — | |
+| river | 0.5.0 | **build-time requirement** — the river protocol XMLs come from the installed `river-protocols.pc`, not from a vendored copy |
 
-Verified with: Arch Linux, GCC 16.2.1, meson 1.12.0, ninja 1.13.2, wayland 1.26.0,
-river 0.4.8.
+Verified with: Arch Linux, GCC 16.2.1, meson 1.12.1, ninja 1.13.2, wayland
+1.26.0, jsoncpp 1.9.8, river 0.5.0.
 
 On Arch:
 
 ```
-sudo pacman -S meson ninja gcc wayland jsoncpp libxkbcommon pixman
+sudo pacman -S meson ninja gcc wayland jsoncpp libxkbcommon pixman river
 ```
 
-> **jsoncpp note.** `meson.build` declares jsoncpp as optional and warns about a
-> "built-in JSON parser" fallback. That fallback does not exist yet: without
-> jsoncpp the build fails at link time. Install it.
+**Why river is a build dependency.** The river protocol XMLs are not vendored.
+`protocols/meson.build` asks `pkg-config` for `river-protocols` and generates the
+client headers from the XMLs the river package installs
+(`pkg-config --variable=pkgdatadir river-protocols`, then its `stable/`
+subdirectory). River ships a version with those XMLs, so the protocol
+definitions and the compositor that speaks them cannot drift apart — a stale
+hand-copied XML is exactly the failure this avoids. The version floor is 0.5.0
+because that is the release whose `river-window-management-v1` XML carries the
+version-6 members yarfwm calls. Without river installed, `meson setup` stops with
+`Dependency "river-protocols" not found`.
+
+`cursor-shape-v1.xml` and `tablet-v2.xml` **are** vendored under `protocols/`.
+They are wayland-protocols interfaces rather than river protocols, so they do not
+come from `river-protocols.pc`; vendoring them keeps `wayland-protocols` out of
+the build requirements.
+
+There is no cursor-theme dependency. The cursor is set through
+`wp_cursor_shape_manager_v1` (cursor-shape-v1), which asks the compositor for a
+shape by name — no cursor image, theme, or `wayland-cursor` link is involved.
 
 ## Quick start
 
@@ -188,8 +256,9 @@ upgrade. Delete one to get the default back.
 ```
 meson.build                       project definition, dependencies, warning flags
 meson_options.txt                 build options (see "Tests" below)
-river-window-management-v1.xml    core protocol definition — the single source of truth
-protocols/                        layer-shell + xkb-bindings protocol XMLs and their build rules
+protocols/                        the vendored wayland-protocols XMLs and the
+                                  build rules that generate from them, plus the
+                                  pkg-config lookup for the river XMLs
 src/                              implementation
 include/                          headers (mirrors src/)
 data/                             icon and default configs (config.json.in, window-decorations.json.in)
@@ -198,10 +267,21 @@ docs/                             developer notes (keybindings, per-feature note
 build/                            meson output directory — generated, never edit, never commit
 ```
 
+Protocol XMLs come from two places:
+
+| protocol | source | why |
+|---|---|---|
+| river-window-management-v1 | the installed river package (`river-protocols.pc`) | the core: windows, outputs, seats, sequences, decorations. Reading it from river means it cannot go stale |
+| river-layer-shell-v1 | the installed river package | river's own layer shell, for bars and wallpapers |
+| river-xkb-bindings-v1 | the installed river package | keyboard bindings |
+| cursor-shape-v1 | vendored, `protocols/cursor-shape-v1.xml` | the cursor shape for an interactive move/resize |
+| tablet-v2 | vendored, `protocols/tablet-v2.xml` | not used directly — cursor-shape-v1's interface table references `zwp_tablet_tool_v2_interface`, so it must be generated for the link to succeed |
+
 Protocol headers and sources are **generated at build time** by `wayland-scanner`
 into `build/protocols/` from the XML files. Nothing generated is checked in; a
-fresh checkout always builds from the XMLs alone. If you need to change protocol
-behavior, edit the XML.
+fresh checkout builds from the XMLs alone. To change protocol behavior, change
+the XML — and for a river protocol, that means upgrading river, since the XML is
+river's.
 
 ## Architecture
 
@@ -212,14 +292,17 @@ view → keybind. Dependency direction, top to bottom:
 | Unit | Role |
 |---|---|
 | `Server` | Wayland connection and registry. Owns the `wl_registry` proxy. |
-| `Display` | Registry listener. Binds `river_window_manager_v1` (clamped to the protocol version) and delegates `river_layer_shell_v1` to `LayerShell`. |
+| `Display` | Registry listener. Binds `river_window_manager_v1` (clamped to the protocol version), `wp_cursor_shape_manager_v1` when offered, and delegates `river_layer_shell_v1` to `LayerShell`. |
 | `LayerShell` | Owns the layer shell global; creates per-output and per-seat state objects. |
 | `View` | The policy core: window and output tracking, floating cascade placement. Owns the `Output` objects. The manage/render handshake lives in `ViewSequences`. |
 | `ViewEvents` | Listener trampolines for the window-management events. |
 | `ViewActions` | The View requests the event handlers and the keybind engine make (close, manage, focus queries, exit session). |
 | `ViewSequences` | The two sequence handlers, `window_manager_manage_start` and `window_manager_render_start`. |
 | `Output` | Per-output state: position, dimensions, layer-shell non-exclusive area, `set_default`. |
-| `Seat` | Per-seat state: keyboard focus and focus history, layer-shell focus tracking. |
+| `Seat` | Per-seat state: keyboard focus and focus history, layer-shell focus tracking, the interactive pointer/touch operation, and the cursor shape for it. |
+| `SeatPointer` | The interactive move/resize handshake: `op_start_pointer`/`op_start_touch`, the cumulative deltas, and the end/cancel paths. |
+| `SeatDecoration` | The `wl_pointer` handlers for the window manager's own decoration surfaces (titlebar buttons and drag). |
+| `CursorShape` | Pure mapping from an operation's kind and resize edges to a cursor-shape value. |
 | `Config` | JSON parsing and the first-startup config write. |
 | `Keybind` | Keyboard bindings: parses `keybinds`, registers one binding object per bind per seat, drives held-key repeat. Action dispatch lives in `KeybindActions`, config parsing in `KeybindParse`. See `docs/keybinds.md`. |
 | `KeybindParse` | The parsing half of the engine: action names, `args`, keysym and modifier resolution. |
@@ -235,13 +318,19 @@ view → keybind. Dependency direction, top to bottom:
 2. **The manage/render loop is mandatory and strictly ordered.**
    `manage_start` → manage-only requests → `manage_finish`; `render_start` →
    render-only requests → `render_finish`. Skipping a finish stalls river's loop.
-3. **The protocol in the repo is v6, but river 0.4.8 enforces v5 sequencing.**
-   The client binds `min(advertised, 6)`, so it binds at 5 today. In v5,
-   `set_position`, `show`/`hide` and every `place_*` request are
-   render-sequence-only, while `propose_dimensions`, `set_capabilities` and
-   `set_default` are manage-sequence-only. Never send v6-only members
-   (`op_start_touch`, `op_end_touch` and the touch events) until river
-   advertises v6.
+3. **Version clamping, not version assumptions.** Every registry bind passes
+   `std::min<uint32_t>(advertised, N)`, so the client binds the lower of what
+   river offers and what the vendored XML describes. River 0.5.0 advertises
+   `river_window_manager_v1` **v6**, `river_xkb_bindings_v1` v3 and
+   `wp_cursor_shape_manager_v1` v2, so the v6 members — the touch move/resize
+   events and `op_start_touch` / `op_end_touch` — are reachable today. They are
+   only reachable *through* the v6 events that request them, so an older
+   compositor never triggers them and no extra guard is needed; but never add a
+   call to a `since=` member without checking what the compositor advertises.
+   Sequence rules are per-request and differ by version: in v5 `set_position`,
+   `show`/`hide` and every `place_*` request are render-sequence-only, while
+   `propose_dimensions`, `set_capabilities` and `set_default` are
+   manage-sequence-only.
 4. **Wayland proxy ownership.** The `wl_registry` belongs to `Server`; other
    units borrow it. Destroying a proxy twice segfaults at shutdown — this
    happened with the registry and is now guarded by convention.
@@ -261,11 +350,17 @@ River runs headless, so you can exercise the WM without touching your session:
 export XDG_RUNTIME_DIR=/tmp/yarfwm-test
 mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
 export WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1
-river -no-xwayland -log-level debug &
+river -no-xwayland -c /bin/true -log-level debug &
 
 WAYLAND_DISPLAY=wayland-1 ./build/src/yarfwm &
 WAYLAND_DISPLAY=wayland-1 foot    # any client
 ```
+
+`-c /bin/true` matters. Without it river runs your real init script
+(`$XDG_CONFIG_HOME/river/init`), which spawns your wallpaper, your bar and its
+own `exec yarfwm`. That yarfwm takes the window-management role first, and the
+binary under test then logs `Yarfwm: window management unavailable` and exits —
+so a probe that forgot `-c` proves nothing about the build under test.
 
 Read river's `debug(wm):` log lines: `window 'foot' mapped`,
 `sent 1 tracked configure(s)`, `layer surface 'wallpaper' mapped`. The
@@ -280,7 +375,16 @@ Pointer paths work headless too: river advertises
 `zwlr_virtual_pointer_manager_v1`, and a small injector built against
 `zwlr-virtual-pointer-unstable-v1.xml` can park or click the pointer at any
 position, which is how click-to-focus, focus-follows-mouse and the keyboard
-pointer warp were verified.
+pointer warp were verified. To exercise an interactive move or resize, press the
+**window manager's own titlebar**: a client-area drag needs a pointer-grab
+serial that only a real client click can authorise, while a titlebar press
+starts the operation directly. The test client must request server-side
+decorations (`zxdg_decoration_manager_v1`, mode `SERVER_SIDE`) or river reports
+it as CSD-only and the window manager draws no titlebar to press.
+
+Also note that a probe which redirects `HOME` exercises the embedded default
+config; without that, the binary reads `$HOME/.config/yarfwm/config.json`, which
+may be older than the defaults in `data/`.
 
 ### Tests
 
@@ -293,24 +397,33 @@ ninja -C build
 meson test -C build
 ```
 
-Nine suites run without a Wayland connection: `placement` and
+Ten suites run without a Wayland connection: `placement` and
 `placement_helpers` (cascade step, directional scoring, desktop wrap,
 dimension-hint clamping), `config` (parsing, removed-key tolerance, the
 first-start default write), `keybind_parse` (keysym folding, modifier masks,
 action names), `view_lock` (the session lock guard), `display_registry` (the
-registry globals the decoration renderer needs, and that nothing extra is
-bound), `decoration_geometry` (button layout, pruning, text band, hit testing,
-offsets), `decoration_renderer` (buffer painting and colour scaling) and
-`window_decorations_config` (colour parsing, fallbacks, the generated file,
-partial and malformed input). Everything else is verified with the headless
-recipe above.
+registry globals the decoration renderer and the cursor need, and that nothing
+extra is bound), `cursor_shape` (the resize-edge to cursor-shape mapping, over
+every edge-bit combination), `decoration_geometry` (button layout, pruning,
+text band, hit testing, offsets), `decoration_renderer` (buffer painting and
+colour scaling) and `window_decorations_config` (colour parsing, fallbacks, the
+generated file, partial and malformed input). Everything else is verified with
+the headless recipe above.
 
 ### Adding a protocol
 
-1. Vendor the XML under `protocols/`.
+1. Decide where the XML belongs. A **river** protocol comes from the installed
+   river package and is already reachable through
+   `river_protocols_directory`; do not copy it into the repo. Anything else —
+   a wayland-protocols interface, a wlroots protocol — is vendored: put the XML
+   under `protocols/`.
 2. Add a `client-header` and a `private-code` `custom_target` pair in
-   `protocols/meson.build`.
-3. List both targets in the `executable()` sources in `src/meson.build`.
+   `protocols/meson.build`, pointing at whichever of the two the XML came from.
+3. List both targets in the `executable()` sources in `src/meson.build`, and in
+   `tests/meson.build` if a suite links the core whole.
+4. If the new protocol's generated code references another interface, that
+   interface's XML has to be generated too or the link fails with an
+   `undefined reference`. `tablet-v2.xml` exists for exactly this reason.
 
 Never check in generated protocol files.
 
@@ -348,6 +461,49 @@ cat /tmp/yarfwm-cfg/home/.config/yarfwm/<name>.json
 
 Then edit a value, run again, and confirm the edit survives.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `dev`, on pull requests
+targeting `master`, and on demand from the Actions tab. One job, steps in order,
+failing fast on the first problem:
+
+1. **Formatting** — `clang-format --dry-run --Werror` over every `.cpp` and
+   `.hpp` in `src/`, `include/` and `tests/`. The whole tree, not just changed
+   files: the repository is formatted as a whole. Runs first because it fails in
+   seconds.
+2. **Build** with `-Dtest=true`, keeping the log.
+3. **Warnings** — fails if any warning comes from this project's own sources.
+   Scoped that way because cairo and pango pull in glib, whose headers emit
+   hundreds of `-Wold-style-cast` warnings from code this project does not own;
+   a blanket `-Werror` is not viable here.
+4. **Unit tests** — `meson test`.
+5. **The shipped configuration** — a second, plain `meson setup` with the
+   default options (no gtest, no test sources), which is what a packager builds.
+   This is the check that nothing test-only has leaked into the core.
+
+It runs in an `archlinux:latest` container because the build reads the river
+protocol XMLs from the installed river package — see "Why river is a build
+dependency" above.
+
+Two things worth knowing about the warning flags, both deliberate:
+
+- **`-Waggregate-return` is not enabled.** It accounted for 229 of this
+  project's warnings, and the codebase carries five separate comments about
+  working around it. It is a style preference rather than a defect signal, and
+  keeping it meant the warning check could never be green.
+- **`-Wduplicated-branches` is not enabled.** GCC 16.2.1 emits it as a false
+  positive for `new (std::nothrow) T[n]`: it claims "this condition has
+  identical branches" for a line with no condition at all, and the warning
+  vanishes if `std::nothrow` is removed — which would break the null check the
+  next line depends on. Minimal reproduction:
+
+  ```cpp
+  #include <new>
+  int *f(int n) { return new (std::nothrow) int[n]; }  // warns, no condition present
+  ```
+
+  The flag would force a choice between a real bug and a warning; the bug wins.
+
 ## Contributing
 
 - Open an issue before non-trivial changes so the approach can be agreed on first.
@@ -365,7 +521,14 @@ Then edit a value, run again, and confirm the edit survives.
 
 ## License
 
-GPL-2.0 — the full text is in `LICENSE` at the repository root; `meson.build`
-declares the same. The protocol XMLs vendored under `protocols/` are
-MIT-licensed, © 2025 Isaac Freund; their copyright headers are preserved in the
-files, and they remain under their own terms.
+GPL-2.0-or-later — the full text is in `LICENSE` at the repository root, and
+`meson.build` declares the same SPDX identifier.
+
+The river protocol XMLs are **not** vendored; they are read from the installed
+river package at build time, so they are not redistributed here. They are
+MIT-licensed (© Isaac Freund), and the installed copies carry their own
+copyright headers. The two XMLs that **are** vendored under `protocols/` are
+MIT-licensed as well: cursor-shape-v1 is © the Chromium Authors and Simon Ser,
+and tablet-v2 is © Stephen "Lyude" Chandler Paul and Red Hat, Inc. Their
+copyright headers are preserved in the files and they remain under their own
+terms. MIT is compatible with GPL-2.0-or-later, so a package should list both.

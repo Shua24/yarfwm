@@ -1,0 +1,137 @@
+# Continuous integration for yarfwm.
+#
+# The pipeline is the one the project's own workflow demands: formatting, a
+# build, the unit tests, and the packaged configuration. It runs on the Arch
+# container because the build reads the river protocol XMLs from the installed
+# river package (see "Why Arch" below) and river is in Arch's official `extra`
+# repository.
+#
+# Branch model: work lands on `dev`; pull requests merge it into `master`.
+# The repository's default branch is `master` -- if that ever changes, the
+# branch filters below are the only thing to update.
+
+name: CI
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [master]
+  # Allows running the pipeline by hand from the Actions tab, which is useful
+  # before opening a pull request.
+  workflow_dispatch:
+
+# A new push to the same branch cancels the run already in flight instead of
+# queueing behind it. On a branch that gets pushed repeatedly this is the
+# difference between feedback in a minute and feedback in ten.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: format, build and test
+    runs-on: ubuntu-latest
+
+    # Why Arch: `protocols/meson.build` reads the river protocol XMLs from the
+    # installed river package through `river-protocols.pc`. They are
+    # deliberately not vendored, so a build needs river present. On Ubuntu that
+    # would mean compiling river from source (zig, slow, fragile); on Arch it
+    # is one pacman package.
+    container:
+      image: archlinux:latest
+
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Sy --noconfirm --needed
+          pacman -S --noconfirm --needed \
+            base-devel meson ninja gcc \
+            wayland jsoncpp libxkbcommon pixman cairo pango \
+            river gtest clang
+
+      # A missing river produces "Dependency river-protocols not found" from
+      # meson, which is accurate but reads as a meson problem rather than a
+      # missing-package problem. Checking here names the actual cause. This
+      # cannot fire while the install step above is intact; it is a guard for
+      # the day someone edits that step.
+      - name: Check the river protocol definitions are present
+        run: |
+          if ! pkg-config --exists river-protocols; then
+            echo "::error::river-protocols.pc not found. The river protocol XMLs are read from the installed river package, so 'river' must be installed before configuring the build."
+            exit 1
+          fi
+          echo "river-protocols $(pkg-config --modversion river-protocols)"
+          echo "protocol directory: $(pkg-config --variable=pkgdatadir river-protocols)/stable"
+
+      - uses: actions/checkout@v4
+
+      # Arch is a rolling release, so the clang-format in the image will
+      # eventually differ from the version this project was formatted with and
+      # start reporting differences in files nobody touched. Naming the version
+      # here turns that into an explicit message instead of a mystery failure.
+      - name: Check the clang-format version
+        run: |
+          expected="23.1.1"
+          installed="$(clang-format --version | awk '{print $3}')"
+          echo "clang-format $installed (expected $expected)"
+          if [ "$installed" != "$expected" ]; then
+            echo "::error::clang-format is $installed but this project is formatted with $expected. Arch's clang is rolling; either reformat the tree with the new version in a dedicated commit, or pin the container image, and update 'expected' here."
+            exit 1
+          fi
+
+      # The whole tree, not just the changed files: the repository is formatted
+      # as a whole, so a single unformatted file is a real inconsistency no
+      # matter who wrote it. Runs before the build because it fails in seconds.
+      - name: Check formatting
+        run: |
+          failed=0
+          while IFS= read -r file; do
+            if ! clang-format --dry-run --Werror "$file" >/dev/null 2>&1; then
+              echo "::error file=$file::not formatted; run: clang-format -i $file"
+              failed=$((failed + 1))
+            fi
+          done < <(find src include tests \( -name '*.cpp' -o -name '*.hpp' \) -type f)
+          if [ "$failed" -ne 0 ]; then
+            echo "$failed file(s) need clang-format"
+            exit 1
+          fi
+          echo "all files formatted"
+
+      # Build the test configuration first so the test step has something to
+      # run, and keep the full log for the warning check below.
+      - name: Configure and build (with tests)
+        run: |
+          meson setup build -Dtest=true
+          ninja -C build 2>&1 | tee build.log
+
+      # Scoped to this project's own sources on purpose: a blanket -Werror is
+      # not viable because cairo and pango pull in glib, whose headers emit
+      # hundreds of -Wold-style-cast warnings from code this project does not
+      # own.
+      #
+      # The path pattern is relative on purpose. GCC reports paths relative to
+      # the build directory ("../src/Foo.cpp"), not absolute ones, so matching
+      # on an absolute prefix silently matches nothing and the check passes
+      # vacuously -- which is worse than not having the check.
+      - name: Check for warnings from this project's own sources
+        run: |
+          own_warnings="$(grep -cE '^\.\./(src|include|tests)/.*warning:' build.log || true)"
+          echo "warnings from src/, include/ and tests/: $own_warnings"
+          if [ "$own_warnings" -ne 0 ]; then
+            grep -E '^\.\./(src|include|tests)/.*warning:' build.log
+            echo "::error::$own_warnings warning(s) from this project's own sources"
+            exit 1
+          fi
+
+      - name: Run the unit tests
+        run: meson test -C build --print-errorlogs
+
+      # The shipped configuration, and the one a packager builds: plain
+      # `meson setup` with the default options, so no gtest and no test
+      # sources. The test build above shares the core sources, so this is the
+      # check that nothing test-only has leaked into the core.
+      - name: Build the shipped configuration (default options)
+        run: |
+          meson setup build-default
+          ninja -C build-default

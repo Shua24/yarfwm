@@ -5,8 +5,10 @@ area with the window title and three buttons (minimize, maximize, close), plus
 a compositor-drawn focus border around the window. Both are the window
 manager's own work — no toolkit, no client cooperation required.
 
-**Status: implemented and unit-tested; the live arm matrix is in
-`.hermes/notes/2026-09-25-ssd/`.** It is not yet approved as shipped behaviour.
+**Status: implemented, unit-tested and shipped.** The live arm matrix is in
+`.hermes/notes/2026-09-25-ssd/`. Decorations are on by default
+(`window-decorations.json` sets `"enabled": true`), and `toggle_decorations`
+(`Super+Shift+D`) turns them off at runtime.
 
 ## Why this exists
 

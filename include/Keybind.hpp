@@ -40,8 +40,8 @@ class Keybind
 	Keybind();
 	~Keybind();
 
-	bool initialize(Server *server, Display *display, Seat *seat,
-			View *view, Config &config);
+	bool initialize(Server *server_state, Display *display_state,
+			Seat *seat_state, View *view_state, Config &config);
 	void terminate();
 
 	// Create the binding objects for any seat that does not have them yet
