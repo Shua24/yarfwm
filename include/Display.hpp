@@ -35,6 +35,13 @@ class Display
 	// the Seat one layer shell seat state per seat.
 	LayerShell layer_shell_state;
 
+	// The wp_cursor_shape_manager_v1 global (cursor-shape-v1). Optional:
+	// a compositor need not advertise it, in which case the window manager
+	// simply never sets a cursor shape and river keeps its default. When it
+	// is present the Seat uses it to show a resize arrow or a grab hand
+	// while an interactive move or resize is in progress.
+	struct wp_cursor_shape_manager_v1 *cursor_shape_manager;
+
 	// The wl_seat globals seen in the registry, by name.
 	//
 	// A river_seat_v1 event carries only the wl_seat's registry *name*

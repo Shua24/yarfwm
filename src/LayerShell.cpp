@@ -14,9 +14,11 @@ void LayerShell::bind_registry_global(struct wl_registry *registry,
 		return;
 	}
 
-	layer_shell = static_cast<struct river_layer_shell_v1 *>(
+	void *layer_shell_global =
 	    wl_registry_bind(registry, name, &river_layer_shell_v1_interface,
-			     std::min<uint32_t>(version, 1)));
+			     std::min<uint32_t>(version, 1));
+	layer_shell =
+	    static_cast<struct river_layer_shell_v1 *>(layer_shell_global);
 	if (!layer_shell) {
 		std::fprintf(stderr,
 			     "Yarfwm: failed to bind river_layer_shell_v1\n");

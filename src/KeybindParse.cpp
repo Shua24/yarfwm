@@ -196,7 +196,9 @@ uint32_t Keybind::resolve_modifiers(const Json::Value &bind, bool *resolved)
 	// The inherited config carries a couple of binds whose Shift sits in a
 	// separate flag rather than in the modifiers array; river compares the
 	// modifier mask exactly, so fold it in.
-	if (bind.get("requires_shift", false).asBool()) {
+	const Json::Value requires_shift_value =
+	    bind.get("requires_shift", false);
+	if (requires_shift_value.asBool()) {
 		modifiers |= RIVER_SEAT_V1_MODIFIERS_SHIFT;
 	}
 

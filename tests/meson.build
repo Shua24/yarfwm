@@ -75,6 +75,10 @@ view_lock_test = executable(
   river_layer_shell_protocol_source,
   river_xkb_bindings_client_header,
   river_xkb_bindings_protocol_source,
+  cursor_shape_client_header,
+  cursor_shape_protocol_source,
+  tablet_v2_client_header,
+  tablet_v2_protocol_source,
   default_config_header,
   include_directories: [
     include_directories('../include'),
@@ -107,6 +111,19 @@ display_registry_test = executable(
 )
 
 test('display_registry', display_registry_test)
+
+# The cursor shape an interactive pointer operation shows. Pure flag
+# arithmetic, so it runs without a Wayland connection like the rest of the
+# pure-logic suites.
+cursor_shape_test = executable(
+  'cursor_shape_test',
+  'CursorShapeTest.cpp',
+  '../src/CursorShape.cpp',
+  include_directories: [include_directories('../include')],
+  dependencies: [gtest, gtest_main],
+)
+
+test('cursor_shape', cursor_shape_test)
 
 # The pure titlebar arithmetic: button layout backwards from the right edge,
 # the pruning rule, the text band, hit testing and the offset. No Wayland, no

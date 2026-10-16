@@ -112,7 +112,7 @@ void Seat::pointer_button(void *data, struct wl_pointer *pointer,
 	case titlebar_part_button_close:
 		seat->view->request_close(window);
 		return;
-	case titlebar_part_bar:
+	case titlebar_part_bar: {
 		// Clicking our own titlebar is a focus+raise, exactly like
 		// clicking the client area. The interaction is consumed for
 		// this press (see river_seat_window_interaction), so do it
@@ -121,13 +121,13 @@ void Seat::pointer_button(void *data, struct wl_pointer *pointer,
 		// river_window_v1.pointer_move_requested. River measures the
 		// op_delta from the pointer position at op_start_pointer, so
 		// no grab offset is needed here.
-		seat->record_focus(seat->find_entry(seat->primary_river_seat()),
-				   window);
+		SeatEntry *entry = seat->find_entry(seat->primary_river_seat());
+		seat->record_focus(entry, window);
 		seat->view->raise_window(window);
-		seat->start_pointer_operation(window,
-					      seat->primary_river_seat(),
+		seat->start_pointer_operation(window, entry->river_seat,
 					      /*is_resize=*/false, /*edges=*/0);
 		return;
+	}
 	case titlebar_part_none:
 	default:
 		return;

@@ -26,10 +26,11 @@ class ConfigTest : public ::testing::Test
 		had_home = home != nullptr;
 		saved_home = home ? home : "";
 
+		const std::string scratch_name = "yarfwm-config-test-" +
+						 std::to_string(::getpid()) +
+						 "-" + std::to_string(counter);
 		const std::filesystem::path base =
-		    std::filesystem::temp_directory_path() /
-		    ("yarfwm-config-test-" + std::to_string(::getpid()) + "-" +
-		     std::to_string(counter));
+		    std::filesystem::temp_directory_path() / scratch_name;
 		counter++;
 		std::filesystem::create_directories(base);
 		scratch = base.string();
@@ -82,7 +83,9 @@ TEST_F(ConfigTest, ReadsTheLiveKeys)
 
 	Config config;
 	ASSERT_TRUE(config.load(path));
-	EXPECT_FALSE(config.input.get("focus_follows_mouse", true).asBool());
+	const Json::Value defaulted_focus_value =
+	    config.input.get("focus_follows_mouse", true);
+	EXPECT_FALSE(defaulted_focus_value.asBool());
 	ASSERT_TRUE(config.keybinds.isArray());
 	EXPECT_EQ(config.keybinds.size(), 1U);
 }
@@ -95,7 +98,9 @@ TEST_F(ConfigTest, MissingFocusFollowsMouseDefaultsToFalse)
 	    write_file(scratch, "config.json", "{\"keybinds\": []}");
 	Config config;
 	ASSERT_TRUE(config.load(path));
-	EXPECT_FALSE(config.input.get("focus_follows_mouse", false).asBool());
+	const Json::Value focus_value =
+	    config.input.get("focus_follows_mouse", false);
+	EXPECT_FALSE(focus_value.asBool());
 }
 
 TEST_F(ConfigTest, AbsentKeybindsIsNotAnArray)
@@ -128,7 +133,9 @@ TEST_F(ConfigTest, IgnoresKeysThatLeftTheSchema)
 	EXPECT_EQ(config.keybinds.size(), 1U);
 	// The file supplies true; the fallback literal is the new absent-key
 	// default, so the assertion is about the file value either way.
-	EXPECT_TRUE(config.input.get("focus_follows_mouse", false).asBool());
+	const Json::Value supplied_focus_value =
+	    config.input.get("focus_follows_mouse", false);
+	EXPECT_TRUE(supplied_focus_value.asBool());
 }
 
 TEST_F(ConfigTest, ReloadingStaysStable)
@@ -150,7 +157,8 @@ TEST_F(ConfigTest, MissingFileWritesTheEmbeddedDefault)
 	// default-write path and loads what it wrote.
 	Config config;
 	ASSERT_TRUE(config.load(scratch + "/does-not-exist.json"));
-	ASSERT_TRUE(std::filesystem::exists(default_config_path()));
+	const std::filesystem::path written_path = default_config_path();
+	ASSERT_TRUE(std::filesystem::exists(written_path));
 
 	Config written;
 	ASSERT_TRUE(written.load(default_config_path()));
@@ -158,7 +166,9 @@ TEST_F(ConfigTest, MissingFileWritesTheEmbeddedDefault)
 	// 47 since toggle_decorations (Super+Shift+D) joined the default set.
 	EXPECT_EQ(written.keybinds.size(), 47U);
 	// The embedded default is click-to-focus now, the labwc default.
-	EXPECT_FALSE(written.input.get("focus_follows_mouse", false).asBool());
+	const Json::Value embedded_focus_value =
+	    written.input.get("focus_follows_mouse", false);
+	EXPECT_FALSE(embedded_focus_value.asBool());
 }
 
 TEST_F(ConfigTest, MalformedFileFallsBackToTheDefault)

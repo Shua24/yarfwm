@@ -56,11 +56,18 @@ add_project_arguments(compiler.get_supported_arguments([
 fs = import('fs')
 
 wayland_client = dependency('wayland-client', version: '>=1.22.90')
-wayland_cursor = dependency('wayland-cursor', required: false)
 xkbcommon = dependency('xkbcommon')
 pixman = dependency('pixman-1')
 math = compiler.find_library('m')
-jsoncpp = dependency('jsoncpp', required: false)
+
+# jsoncpp is required, not optional. It was declared optional and warned about
+# a "built-in JSON parser" fallback, but that fallback was never written:
+# HAVE_JSONCPP is read nowhere, src/meson.build links jsoncpp unconditionally,
+# and include/Config.hpp, include/Keybind.hpp and
+# src/WindowDecorationsConfig.cpp all include <json/json.h>. A build without it
+# failed at link time, so declaring it required is the honest form of what the
+# build already demanded.
+jsoncpp = dependency('jsoncpp')
 
 # The decoration renderer. cairo paints the titlebar into a shared-memory
 # buffer and pango lays out the title text; both are linked only into the
@@ -69,14 +76,6 @@ jsoncpp = dependency('jsoncpp', required: false)
 # Decoration class instead of including it).
 cairo = dependency('cairo')
 pangocairo = dependency('pangocairo')
-
-configuration_data_values = configuration_data()
-configuration_data_values.set10('HAVE_WAYLAND_CURSOR', wayland_cursor.found())
-configuration_data_values.set10('HAVE_JSONCPP', jsoncpp.found())
-
-if not jsoncpp.found()
-  warning('jsoncpp not found: falling back to minimal built-in JSON parser for config loading')
-endif
 
 install_data('data/icons/yarfwm.svg', install_dir: get_option('datadir') / 'icons/hicolor/scalable/apps')
 

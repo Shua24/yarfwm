@@ -121,7 +121,7 @@ void View::toggle_maximize(struct river_window_v1 *window)
 		// keeps the window manager responsible for the geometry of a
 		// maximized window, so this is a position and a proposal like
 		// any other. This is to work around GTK windows setting its
-    // own rules upon fullscreen (damn you, GTK).
+		// own rules upon fullscreen (damn you, GTK).
 		//
 		// placement_area(), NOT content_area(). The only difference
 		// between the two is the reserved titlebar strip
@@ -140,8 +140,8 @@ void View::toggle_maximize(struct river_window_v1 *window)
 		// has to sit above the window. Do not "tidy" this back to
 		// content_area(); that reintroduces the bug.
 		// (Damn you, GTK developers for making the windows
-    // draw itself via CSD even on Wayland)
-    //
+		// draw itself via CSD even on Wayland)
+		//
 		// Measured with a control binary on a 1280x720 output:
 		// content_area() proposes 1280x693, placement_area() proposes
 		// 1280x720.

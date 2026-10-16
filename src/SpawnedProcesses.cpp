@@ -16,8 +16,9 @@ void read_child_process_ids(std::vector<pid_t> *child_process_ids)
 
 	char path[64];
 	// Dynamic memory: none. The thread id is formatted into a fixed buffer.
+	const int process_id = static_cast<int>(getpid());
 	std::snprintf(path, sizeof(path), "/proc/%d/task/%d/children",
-		      static_cast<int>(getpid()), static_cast<int>(getpid()));
+		      process_id, process_id);
 
 	const int descriptor = open(path, O_RDONLY | O_CLOEXEC);
 	if (descriptor < 0) {

@@ -25,6 +25,7 @@ yarfwm_core_sources = files(
   'DecorationGeometry.cpp',
   'DecorationRenderer.cpp',
   'Decoration.cpp',
+  'CursorShape.cpp',
   'ShmBuffer.cpp',
   'Config.cpp',
   'WindowDecorationsConfig.cpp',
@@ -63,6 +64,10 @@ executable(
   river_layer_shell_protocol_source,
   river_xkb_bindings_client_header,
   river_xkb_bindings_protocol_source,
+  cursor_shape_client_header,
+  cursor_shape_protocol_source,
+  tablet_v2_client_header,
+  tablet_v2_protocol_source,
   default_config_header,
   default_decorations_config_header,
   dependencies: [

@@ -24,5 +24,8 @@ RegistryInterfaceKind classify_registry_interface(const char *interface_name)
 	if (std::strcmp(interface_name, "wl_seat") == 0) {
 		return registry_interface_seat;
 	}
+	if (std::strcmp(interface_name, "wp_cursor_shape_manager_v1") == 0) {
+		return registry_interface_cursor_shape;
+	}
 	return registry_interface_unknown;
 }
