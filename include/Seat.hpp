@@ -91,14 +91,14 @@ class Seat
 	Seat();
 	~Seat();
 
-	bool initialize(Server *server, Display *display, Config &config);
+	bool initialize(Server *server, Display *display_state, Config &config);
 	void terminate();
 
 	// Called when river hands the window manager a new river_seat_v1. The
 	// View is passed so that a recorded focus change can ask for a manage
 	// sequence.
 	void attach_river_seat(struct river_seat_v1 *river_seat,
-			       LayerShell &layer_shell, View *view);
+			       LayerShell &layer_shell, View *view_state);
 
 	// Focus intent: recorded now, sent as river_seat_v1.focus_window during
 	// the next manage sequence. A null window clears the focus instead.

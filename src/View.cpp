@@ -43,15 +43,15 @@ View::View()
 
 View::~View() { terminate(); }
 
-bool View::initialize(Server *server, Seat *seat, Display *display,
+bool View::initialize(Server *server, Seat *seat_state, Display *display_state,
 		      Config &config,
 		      const WindowDecorationsConfig &decoration_config)
 {
 	// Dynamic memory: window and output tracking arrays grow on demand.
 	(void)server;
 	(void)config;
-	this->seat = seat;
-	this->display = display;
+	this->seat = seat_state;
+	this->display = display_state;
 
 	// The decoration appearance is read exactly once, here. Everything the
 	// renderer needs is resolved into decoration_settings now, so the
@@ -59,13 +59,13 @@ bool View::initialize(Server *server, Seat *seat, Display *display,
 	decoration_settings_from(decoration_config, &decoration_settings);
 	decorations_on = decoration_config.enabled;
 
-	if (!display->window_manager) {
+	if (!display_state->window_manager) {
 		std::fprintf(stderr,
 			     "Yarfwm: no river_window_manager_v1 available\n");
 		return false;
 	}
 
-	manager = display->window_manager;
+	manager = display_state->window_manager;
 
 	static const struct river_window_manager_v1_listener manager_listener =
 	    {
@@ -74,7 +74,7 @@ bool View::initialize(Server *server, Seat *seat, Display *display,
 		window_manager_session_locked, window_manager_session_unlocked,
 		window_manager_window,	       window_manager_output,
 		window_manager_seat,
-	    };
+	};
 
 	if (river_window_manager_v1_add_listener(manager, &manager_listener,
 						 this) != 0) {

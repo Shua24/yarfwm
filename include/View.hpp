@@ -25,8 +25,8 @@ class View
 	View();
 	~View();
 
-	bool initialize(Server *server, Seat *seat, Display *display,
-			Config &config,
+	bool initialize(Server *server, Seat *seat_state,
+			Display *display_state, Config &config,
 			const WindowDecorationsConfig &decoration_config);
 	void terminate();
 

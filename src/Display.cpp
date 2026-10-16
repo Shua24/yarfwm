@@ -103,15 +103,11 @@ void Display::seat_name(void *data, struct wl_seat *wl_seat, const char *name)
 
 Display::~Display() { terminate(); }
 
-static void display_handle_destroy(struct wl_listener *listener, void *data)
-{
-	(void)listener;
-	(void)data;
-	// B11: the old handler cast the listener data to Display* and called
-	// terminate() from inside a dispatch callback. Shutdown now travels
-	// through View::shutdown_requested and the main loop, so this stays
-	// unused.
-}
+// B11: there used to be a display destroy handler here. It cast the listener
+// data to Display* and called terminate() from inside a dispatch callback,
+// which is why shutdown now travels through View::shutdown_requested and the
+// main loop instead. The function was left behind with no reference to it; it
+// is gone now rather than kept as a warning under -Wunused-function.
 
 static void registry_handle_global(void *data, struct wl_registry *registry,
 				   uint32_t name, const char *interface,

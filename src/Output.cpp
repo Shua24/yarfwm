@@ -41,7 +41,7 @@ bool Output::initialize(LayerShell &layer_shell, struct river_output_v1 *output,
 			static const struct river_layer_shell_output_v1_listener
 			    layer_shell_output_listener = {
 				layer_shell_output_non_exclusive_area,
-			    };
+			};
 
 			if (river_layer_shell_output_v1_add_listener(
 				layer_shell_output,
