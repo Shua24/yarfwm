@@ -1,0 +1,26 @@
+pkgbase = yarfwm-git
+	pkgdesc = A floating window manager client for the river Wayland compositor (master branch)
+	pkgver = r16.50e924b
+	pkgrel = 1
+	url = https://github.com/Shua24/yarfwm
+	arch = x86_64
+	license = GPL-2.0-or-later
+	makedepends = git
+	makedepends = gtest
+	makedepends = meson
+	makedepends = river
+	depends = cairo
+	depends = glib2
+	depends = glibc
+	depends = jsoncpp
+	depends = libgcc
+	depends = libstdc++
+	depends = libxkbcommon
+	depends = pango
+	depends = wayland
+	provides = yarfwm
+	conflicts = yarfwm
+	source = yarfwm-git::git+https://github.com/Shua24/yarfwm.git#branch=master
+	sha256sums = SKIP
+
+pkgname = yarfwm-git

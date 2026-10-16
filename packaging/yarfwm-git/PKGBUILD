@@ -1,0 +1,75 @@
+# Maintainer: Shua24 <shuwafuwa4@gmail.com>
+#
+# yarfwm-git tracks the master branch. Use this package to follow development;
+# use `yarfwm` for a pinned build. The two conflict: both install
+# /usr/bin/yarfwm.
+#
+# yarfwm is a floating window manager *client* for the river Wayland compositor.
+# It is not a compositor and not a standalone application: it only runs while
+# river is already up and advertising river_window_manager_v1, started from
+# river's own init script (`exec yarfwm` in $XDG_CONFIG_HOME/river/init).
+# That is why no .desktop file and no wayland-session entry are installed.
+
+pkgname=yarfwm-git
+pkgver=r16.50e924b
+pkgrel=1
+pkgdesc="A floating window manager client for the river Wayland compositor (master branch)"
+arch=('x86_64')
+url="https://github.com/Shua24/yarfwm"
+license=('GPL-2.0-or-later')
+depends=(
+  'cairo'
+  'glib2'
+  'glibc'
+  'jsoncpp'
+  'libgcc'
+  'libstdc++'
+  'libxkbcommon'
+  'pango'
+  'wayland'
+)
+# river is a build-time dependency only: the build reads the river protocol XML
+# definitions from river's own pkg-config file so they cannot drift from the
+# compositor that speaks them. yarfwm links no river library.
+makedepends=(
+  'git'
+  'gtest'
+  'meson'
+  'river'
+)
+provides=('yarfwm')
+conflicts=('yarfwm')
+
+source=("$pkgname::git+https://github.com/Shua24/yarfwm.git#branch=master")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$pkgname"
+
+  # The project carries no release tags, so `git describe` has nothing to
+  # describe and would fail. The AUR convention for an untagged repository is
+  # r<commit-count>.<short-sha>, which is monotonic as long as history only
+  # grows -- which is why the count comes first.
+  commit_count=$(git rev-list --count HEAD)
+  short_hash=$(git rev-parse --short=7 HEAD)
+  printf 'r%s.%s' "$commit_count" "$short_hash"
+}
+
+build() {
+  cd "$pkgname"
+
+  # -Dtest=true so check() has tests to run; it does not change the installed
+  # artifacts (tests declare no install rules).
+  arch-meson build -Dtest=true
+  meson compile -C build
+}
+
+check() {
+  cd "$pkgname"
+  meson test -C build --print-errorlogs
+}
+
+package() {
+  cd "$pkgname"
+  DESTDIR="$pkgdir" meson install -C build --skip-subprojects
+}
