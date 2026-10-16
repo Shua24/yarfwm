@@ -1,6 +1,7 @@
 #include "Display.hpp"
 #include "RegistryInterfaces.hpp"
 #include "Seat.hpp"
+#include "cursor-shape-v1-client-protocol.h"
 #include "river-window-management-v1-client-protocol.h"
 #include "river-xkb-bindings-v1.hpp"
 #include <algorithm>
@@ -10,7 +11,8 @@
 
 Display::Display()
     : registry(nullptr), compositor(nullptr), shared_memory(nullptr),
-      window_manager(nullptr), xkb_bindings(nullptr), seat_name_count(0)
+      window_manager(nullptr), xkb_bindings(nullptr),
+      cursor_shape_manager(nullptr), seat_name_count(0)
 {
 	std::memset(seat_names, 0, sizeof(seat_names));
 	std::memset(seats, 0, sizeof(seats));
@@ -184,6 +186,19 @@ static void registry_handle_global(void *data, struct wl_registry *registry,
 		display->remember_seat(name, bound_seat);
 		break;
 	}
+	case registry_interface_cursor_shape: {
+		// wp_cursor_shape_manager_v1: optional. When river advertises
+		// it the Seat can set the cursor it owns during a pointer
+		// operation by name, with no cursor theme or image on disk.
+		// When it is absent the pointer simply keeps river's default.
+		void *cursor_shape_global = wl_registry_bind(
+		    registry, name, &wp_cursor_shape_manager_v1_interface,
+		    std::min<uint32_t>(version, 2));
+		display->cursor_shape_manager =
+		    static_cast<struct wp_cursor_shape_manager_v1 *>(
+			cursor_shape_global);
+		break;
+	}
 	case registry_interface_unknown:
 	default:
 		// Every other global is deliberately ignored.
@@ -238,6 +253,10 @@ void Display::terminate()
 	if (xkb_bindings) {
 		river_xkb_bindings_v1_destroy(xkb_bindings);
 		xkb_bindings = nullptr;
+	}
+	if (cursor_shape_manager) {
+		wp_cursor_shape_manager_v1_destroy(cursor_shape_manager);
+		cursor_shape_manager = nullptr;
 	}
 	if (window_manager) {
 		river_window_manager_v1_destroy(window_manager);

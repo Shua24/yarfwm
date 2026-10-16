@@ -15,6 +15,13 @@ enum RegistryInterfaceKind {
 	// surface, so the Seat needs a pointer, and the pointer comes from the
 	// seat. Nothing else about the seat is used.
 	registry_interface_seat,
+	// wp_cursor_shape_manager_v1 (cursor-shape-v1): how the window
+	// manager asks for a cursor shape by name. River advertises it, and
+	// it is what lets the window manager show a resize arrow or a grab
+	// hand during an interactive operation -- the cursor river's own
+	// version-4 note says the window manager owns when no client has
+	// pointer focus.
+	registry_interface_cursor_shape,
 };
 
 // Pure: no Wayland call, so the classification is unit testable.

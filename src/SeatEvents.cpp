@@ -1,6 +1,7 @@
 #include "Display.hpp"
 #include "Seat.hpp"
 #include "View.hpp"
+#include "cursor-shape-v1-client-protocol.h"
 #include "river-layer-shell-v1-client-protocol.h"
 #include "river-window-management-v1-client-protocol.h"
 
@@ -90,6 +91,19 @@ void Seat::update_pointer_capability(struct wl_seat *wl_seat, bool has_pointer)
 	entry->pointer = wl_seat_get_pointer(wl_seat);
 	if (!entry->pointer) {
 		return;
+	}
+
+	// The cursor-shape device, when river advertises the global. It is
+	// how the window manager sets the cursor river uses while no client
+	// has pointer focus -- precisely the case during an interactive move
+	// or resize. Absent the global, entry->cursor_shape_device stays null
+	// and the pointer keeps river's default shape.
+	if (entry->owner->display &&
+	    entry->owner->display->cursor_shape_manager) {
+		entry->cursor_shape_device =
+		    wp_cursor_shape_manager_v1_get_pointer(
+			entry->owner->display->cursor_shape_manager,
+			entry->pointer);
 	}
 
 	static const struct wl_pointer_listener pointer_listener = [] {

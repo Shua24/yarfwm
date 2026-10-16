@@ -1,5 +1,7 @@
+#include "CursorShape.hpp"
 #include "Seat.hpp"
 #include "View.hpp"
+#include "cursor-shape-v1-client-protocol.h"
 #include "river-window-management-v1-client-protocol.h"
 
 #include <cstdio>
@@ -29,6 +31,42 @@ static const int32_t minimum_resize_extent = 64;
 bool Seat::pointer_operation_active() const
 {
 	return pointer_operation.kind != PointerOperation::kind_none;
+}
+
+// Tell the compositor which cursor this seat should show for the operation
+// that is running, or the default one when it is over.
+//
+// River's river_seat_v1 description says the cursor the window manager sets on
+// the seat's wl_pointer "is used when no client has pointer focus, for example
+// during a pointer operation" -- so this is the window manager's cursor to
+// set, and it is the only reason the Seat holds a cursor-shape device. The
+// call is a no-op when the compositor never advertised the global: the device
+// is null then and the pointer keeps river's default shape.
+void Seat::apply_cursor_shape(bool operation_in_progress)
+{
+	SeatEntry *entry = find_entry(primary_river_seat());
+	if (!entry || !entry->cursor_shape_device) {
+		return;
+	}
+
+	const bool is_resize =
+	    pointer_operation.kind == PointerOperation::kind_resize;
+	uint32_t edges = 0;
+	CursorShape shape = cursor_shape_default;
+
+	if (operation_in_progress) {
+		edges = pointer_operation.resize_edges;
+		shape = cursor_shape_for_operation(is_resize, edges);
+	}
+
+	const uint32_t shape_value = static_cast<uint32_t>(shape);
+	// The serial is deliberately zero. river_seat_v1's description says
+	// the compositor "must ignore the serial argument of
+	// wl_pointer.set_cursor and wp_cursor_shape_device_v1.set_shape
+	// requests made by the window manager", precisely so a window manager
+	// can set its cursor without holding a recent input serial.
+	wp_cursor_shape_device_v1_set_shape(entry->cursor_shape_device, 0,
+					    shape_value);
 }
 
 void Seat::start_pointer_operation(struct river_window_v1 *window,
@@ -91,6 +129,12 @@ void Seat::start_operation(struct river_window_v1 *window,
 	std::fprintf(stderr, "Yarfwm: %s%s requested from %d,%d %dx%d\n",
 		     is_touch ? "touch " : "", is_resize ? "resize" : "move",
 		     geometry.x, geometry.y, geometry.width, geometry.height);
+
+	// Show the cursor for the operation from the moment the grab starts,
+	// not from op_start_pointer: river clears client pointer focus as soon
+	// as it sees the operation, and the window manager's cursor is what
+	// takes over then.
+	apply_cursor_shape(true);
 
 	// op_start_pointer / op_start_touch are manage-sequence-only, so ask
 	// for the sequence that will send it.
@@ -207,6 +251,12 @@ void Seat::clear_pointer_operation()
 	pointer_operation.end_requested = false;
 	pointer_operation.cancel_requested = false;
 	pointer_operation.resize_edges = 0;
+
+	// Hand the cursor back. This is the single exit for every way an
+	// operation ends -- a clean release, a cancel, or the window dying
+	// mid-grab (Seat::forget_window) -- so the default shape is restored
+	// exactly once per operation, and never left showing a grab hand.
+	apply_cursor_shape(false);
 }
 
 void Seat::river_seat_op_delta(void *data, struct river_seat_v1 *river_seat,

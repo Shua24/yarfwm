@@ -8,6 +8,7 @@ struct river_seat_v1;
 struct river_layer_shell_seat_v1;
 struct river_shell_surface_v1;
 struct river_window_v1;
+struct wp_cursor_shape_device_v1;
 
 class Display;
 class Config;
@@ -176,6 +177,11 @@ class Seat
 	// Whether an interactive move or resize is in progress.
 	bool pointer_operation_active() const;
 
+	// Tell the compositor which cursor this seat shows: the shape for the
+	// operation in progress, or the default when it is over. No-op when
+	// the compositor never advertised wp_cursor_shape_manager_v1.
+	void apply_cursor_shape(bool operation_in_progress);
+
 	// The wl_pointer for a seat, used for exactly one thing: the window
 	// manager's own surfaces. River routes a press on a window to
 	// river_seat_v1.window_interaction, but a press on a decoration surface
@@ -284,6 +290,14 @@ class Seat
 		// decoration surfaces only.
 		struct wl_seat *wl_seat;
 		struct wl_pointer *pointer;
+
+		// The cursor-shape device for this seat, when the compositor
+		// advertises wp_cursor_shape_manager_v1. River uses the cursor
+		// the window manager sets on this seat's wl_pointer whenever no
+		// client has pointer focus, which is exactly the case during an
+		// interactive move or resize. Null when the global is absent,
+		// in which case the pointer keeps river's default shape.
+		struct wp_cursor_shape_device_v1 *cursor_shape_device;
 
 		// Focus state. previous_focused_window is what
 		// focus_window_previous returns to;

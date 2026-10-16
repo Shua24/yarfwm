@@ -3,6 +3,7 @@
 #include "Display.hpp"
 #include "LayerShell.hpp"
 #include "View.hpp"
+#include "cursor-shape-v1-client-protocol.h"
 #include "river-layer-shell-v1-client-protocol.h"
 #include "river-window-management-v1-client-protocol.h"
 #include <cstdio>
@@ -113,7 +114,7 @@ void Seat::attach_river_seat(struct river_seat_v1 *river_seat,
 				layer_shell_seat_focus_exclusive,
 				layer_shell_seat_focus_non_exclusive,
 				layer_shell_seat_focus_none,
-			    };
+			};
 
 			if (river_layer_shell_seat_v1_add_listener(
 				entry->layer_shell_seat,
@@ -189,6 +190,25 @@ void Seat::forget_window(struct river_window_v1 *window)
 {
 	if (!window) {
 		return;
+	}
+
+	// An interactive move or resize holds the window it is dragging, and
+	// that reference lives here on the seat rather than on the window, so
+	// it outlives the window's destruction. Without this the next
+	// op_delta would hand a destroyed river_window_v1 to
+	// View::set_user_geometry (a use-after-free), and the stale slot would
+	// leave pointer_operation_active() true forever, refusing every later
+	// drag.
+	//
+	// The operation is not abandoned silently: dropping the window and
+	// requesting the end makes the next manage sequence send op_end or
+	// op_end_touch, which is what tells river to stop sending deltas for
+	// it. The geometry cannot be restored because the window is gone, so
+	// the end path takes over from the cancel path.
+	if (pointer_operation_active() && pointer_operation.window == window) {
+		pointer_operation.window = nullptr;
+		pointer_operation.cancel_requested = false;
+		pointer_operation.end_requested = true;
 	}
 
 	for (int i = 0; i < seat_count; i++) {
@@ -403,8 +423,13 @@ void Seat::apply_manage()
 void Seat::terminate()
 {
 	for (int i = 0; i < seat_count; i++) {
-		// The pointer before the seat it came from: a wl_pointer is a
-		// child object and must not outlive its wl_seat.
+		// The cursor-shape device is a child of the wl_pointer, so it
+		// goes first; the pointer before the seat it came from.
+		if (seat_entries[i].cursor_shape_device) {
+			wp_cursor_shape_device_v1_destroy(
+			    seat_entries[i].cursor_shape_device);
+			seat_entries[i].cursor_shape_device = nullptr;
+		}
 		if (seat_entries[i].pointer) {
 			wl_pointer_destroy(seat_entries[i].pointer);
 			seat_entries[i].pointer = nullptr;
